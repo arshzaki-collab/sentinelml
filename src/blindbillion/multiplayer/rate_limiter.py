@@ -23,6 +23,12 @@ class RateLimiter:
         threshold = now - window_seconds
 
         with self._lock:
+            # Periodic cleanup if dictionary grows large
+            if len(self._records) > 10000:
+                stale_keys = [k for k, v in self._records.items() if not v or v[-1] <= threshold]
+                for k in stale_keys:
+                    del self._records[k]
+
             timestamps = self._records[key]
             # Prune expired entries
             valid_timestamps = [t for t in timestamps if t > threshold]

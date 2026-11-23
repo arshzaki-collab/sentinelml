@@ -40,6 +40,8 @@ logs/*.log
 logs/*.csv
 !logs/.gitkeep
 *.sqlite3
+*.db
+*.db-journal
 *.duckdb
 *.duckdb.wal
 

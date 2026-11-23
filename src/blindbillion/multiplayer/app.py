@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Annotated
 
 import duckdb
@@ -23,7 +24,7 @@ from blindbillion.engine.engine import GameEngine
 from blindbillion.multiplayer.connection_manager import connection_manager
 from blindbillion.multiplayer.db import get_db as get_db
 from blindbillion.multiplayer.db import get_engine, init_db
-from blindbillion.multiplayer.db_models import RoomModel
+from blindbillion.multiplayer.db_models import RoomModel, RoomPlayerModel
 from blindbillion.multiplayer.game_coordinator import GameCoordinator
 from blindbillion.multiplayer.models import (
     ActionResponse,
@@ -69,9 +70,15 @@ def create_app() -> FastAPI:
         description="Server-authoritative multiplayer backend with realtime synchronization.",
     )
 
+    allowed_origins_env = os.environ.get(
+        "ALLOWED_ORIGINS",
+        "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
+    )
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins if allowed_origins else ["http://localhost:5173"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -142,8 +149,17 @@ def create_app() -> FastAPI:
     )
     def get_room_endpoint(
         room_code: str,
+        request: Request,
         db: Annotated[Session, Depends(get_db)],
     ) -> RoomPublicView:
+        client_ip = request.client.host if request.client else "unknown"
+        rate_key = f"get_room_{client_ip}"
+        if not global_rate_limiter.check_rate_limit(rate_key, max_requests=60, window_seconds=60.0):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Room query rate limit exceeded. Please wait.",
+            )
+
         code = room_code.strip().upper()
         room = db.query(RoomModel).filter(RoomModel.room_code == code).first()
         if not room:
@@ -297,14 +313,18 @@ def create_app() -> FastAPI:
 
         player.is_connected = True
         db.commit()
+        player_id = player.player_id
+        display_name = player.display_name
+        # Release DB connection back to pool during active WebSocket loop
+        db.close()
 
         await connection_manager.connect(
-            room_code=room_code, player_id=player.player_id, websocket=websocket
+            room_code=room_code, player_id=player_id, websocket=websocket
         )
         await connection_manager.broadcast_to_room(
             room_code=room_code,
             event=RealtimeEventType.PLAYER_RECONNECTED,
-            payload={"player_id": player.player_id, "display_name": player.display_name},
+            payload={"player_id": player_id, "display_name": display_name},
         )
 
         try:
@@ -313,15 +333,22 @@ def create_app() -> FastAPI:
                 if data == "ping":
                     await websocket.send_text("pong")
         except WebSocketDisconnect:
-            await connection_manager.disconnect(room_code=room_code, player_id=player.player_id)
-            player.is_connected = False
-            migrated_host_id = RoomManager.migrate_host_if_needed(session=db, room=player.room)
-            db.commit()
+            await connection_manager.disconnect(room_code=room_code, player_id=player_id)
+            player_record = (
+                db.query(RoomPlayerModel).filter(RoomPlayerModel.player_id == player_id).first()
+            )
+            migrated_host_id: str | None = None
+            if player_record:
+                player_record.is_connected = False
+                migrated_host_id = RoomManager.migrate_host_if_needed(
+                    session=db, room=player_record.room
+                )
+                db.commit()
 
             await connection_manager.broadcast_to_room(
                 room_code=room_code,
                 event=RealtimeEventType.PLAYER_DISCONNECTED,
-                payload={"player_id": player.player_id, "display_name": player.display_name},
+                payload={"player_id": player_id, "display_name": display_name},
             )
 
             if migrated_host_id:

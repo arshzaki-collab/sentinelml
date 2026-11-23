@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from blindbillion.engine.engine import GameEngine
+from blindbillion.engine.exceptions import BlindBillionEngineError
 from blindbillion.engine.models import GamePhase, GameState
 from blindbillion.engine.timeline import GAME_TIMELINE_STEPS, get_timeline_step
 from blindbillion.multiplayer.db_models import (
@@ -144,8 +145,13 @@ class GameCoordinator:
             cached_dict = json.loads(idempotency_rec.response_payload)
             return ActionResponse.model_validate(cached_dict)
 
-        # 2. Room & Phase Validation
-        room = session.query(RoomModel).filter(RoomModel.room_code == clean_code).first()
+        # 2. Room & Phase Validation with Row-Level Lock
+        room = (
+            session.query(RoomModel)
+            .filter(RoomModel.room_code == clean_code)
+            .with_for_update()
+            .first()
+        )
         if not room:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found.")
 
@@ -172,52 +178,68 @@ class GameCoordinator:
 
         current_state = GameState.model_validate_json(state_model.serialized_state)
 
-        # 4. Execute Action
+        # 4. Execute Action under Domain Exception Guard
         msg = ""
-        if request.action_type == "BUY":
-            if not request.candidate_token:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="candidate_token is required for BUY action.",
+        try:
+            if request.action_type == "BUY":
+                if not request.candidate_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="candidate_token is required for BUY action.",
+                    )
+                if player.is_turn_submitted:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Purchase already submitted for this slot. Awaiting other players.",
+                    )
+                current_state = self.engine.purchase_candidate(
+                    state=current_state, candidate_token=request.candidate_token
                 )
-            if player.is_turn_submitted:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Purchase already submitted for this slot. Awaiting other players.",
-                )
-            current_state = self.engine.purchase_candidate(
-                state=current_state, candidate_token=request.candidate_token
-            )
-            player.is_turn_submitted = True
-            msg = f"Candidate purchased for Slot {current_state.current_slot_index}."
+                player.is_turn_submitted = True
+                msg = f"Candidate purchased for Slot {current_state.current_slot_index}."
 
-        elif request.action_type == "REPLACE":
-            if request.slot_index is None or not request.candidate_token:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="slot_index and candidate_token required for REPLACE action.",
+            elif request.action_type == "REPLACE":
+                if request.slot_index is None or not request.candidate_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="slot_index and candidate_token required for REPLACE action.",
+                    )
+                current_state = self.engine.replace_player(
+                    state=current_state,
+                    slot_index=request.slot_index,
+                    replacement_candidate_token=request.candidate_token,
                 )
-            current_state = self.engine.replace_player(
-                state=current_state,
-                slot_index=request.slot_index,
-                replacement_candidate_token=request.candidate_token,
-            )
-            msg = f"Replaced player in Slot {request.slot_index}."
+                msg = f"Replaced player in Slot {request.slot_index}."
 
-        elif request.action_type == "SELL":
-            if request.slot_index is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="slot_index required for SELL action.",
+            elif request.action_type == "SELL":
+                if request.slot_index is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="slot_index required for SELL action.",
+                    )
+                current_state = self.engine.sell_player(
+                    state=current_state, slot_index=request.slot_index
                 )
-            current_state = self.engine.sell_player(
-                state=current_state, slot_index=request.slot_index
-            )
-            msg = f"Sold player from Slot {request.slot_index}."
+                msg = f"Sold player from Slot {request.slot_index}."
 
-        elif request.action_type == "PASS":
-            player.is_turn_submitted = True
-            msg = f"Ready for next round in {room.current_year}."
+            elif request.action_type == "PASS":
+                if room.current_phase != GamePhase.TRANSFER_WINDOW.value:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"PASS action is not permitted during {room.current_phase}.",
+                    )
+                if player.is_turn_submitted:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Turn already submitted for this round.",
+                    )
+                player.is_turn_submitted = True
+                msg = f"Ready for next round in {room.current_year}."
+        except BlindBillionEngineError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(err),
+            ) from err
 
         # 5. Persist Player State
         state_model.serialized_state = current_state.model_dump_json()

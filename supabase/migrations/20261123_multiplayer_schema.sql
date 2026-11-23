@@ -84,22 +84,7 @@ ALTER TABLE public.room_players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.player_game_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.action_idempotency_records ENABLE ROW LEVEL SECURITY;
 
--- Allow public read of active rooms by room code
-CREATE POLICY "Allow public read on rooms"
-    ON public.rooms FOR SELECT
-    USING (true);
-
--- Allow room players to read all players in the same room
-CREATE POLICY "Allow room members to read room players"
-    ON public.room_players FOR SELECT
-    USING (true);
-
--- Allow players to view only their own player state during active play
-CREATE POLICY "Allow players to read own game state"
-    ON public.player_game_states FOR SELECT
-    USING (player_id = current_setting('request.jwt.claim.sub', true));
-
--- Service role full access for backend API operations
+-- Service role full access for backend API operations (authoritative gateway)
 CREATE POLICY "Service role full access on rooms"
     ON public.rooms FOR ALL
     TO service_role
@@ -124,14 +109,18 @@ CREATE POLICY "Service role full access on idempotency"
     USING (true)
     WITH CHECK (true);
 
+-- Sanitized public view excluding session_token and secret identifiers
+CREATE OR REPLACE VIEW public.room_players_public AS
+    SELECT player_id, room_code, display_name, is_host, is_ready, is_connected, is_turn_submitted, joined_at
+    FROM public.room_players;
+
 -- ------------------------------------------------------------------------------
 -- 6. SUPABASE REALTIME PUBLICATION
 -- ------------------------------------------------------------------------------
--- Enable Supabase Realtime broadcast and CDC on rooms and player tables
+-- Enable Supabase Realtime broadcast and CDC on rooms only (room_players omitted to prevent session_token leakage)
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.rooms;
-        ALTER PUBLICATION supabase_realtime ADD TABLE public.room_players;
     END IF;
 END $$;

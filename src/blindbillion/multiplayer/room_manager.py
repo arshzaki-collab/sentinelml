@@ -152,7 +152,12 @@ class RoomManager:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Player name cannot be empty."
             )
 
-        room = session.query(RoomModel).filter(RoomModel.room_code == clean_code).first()
+        room = (
+            session.query(RoomModel)
+            .filter(RoomModel.room_code == clean_code)
+            .with_for_update()
+            .first()
+        )
         if not room:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Room '{clean_code}' not found."
