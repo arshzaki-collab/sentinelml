@@ -317,7 +317,8 @@ class GameEngine:
                 f"shortlist for Slot {slot_index}."
             ) from err
 
-        if rep_player_id not in slot.original_shortlist_player_ids:
+        allowed_ids = set(slot.original_shortlist_player_ids) | set(shortlist.secret_player_ids)
+        if rep_player_id not in allowed_ids:
             raise InvalidReplacementCandidateError(
                 f"Candidate {rep_player_id} is not in the original shortlist for Slot {slot_index}."
             )

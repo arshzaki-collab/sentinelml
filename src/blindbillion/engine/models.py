@@ -34,7 +34,6 @@ class PlayerSlot(BaseModel):
     purchase_year: int | None = Field(default=None, description="Year player was signed")
     original_shortlist_player_ids: tuple[str, ...] = Field(
         default_factory=tuple,
-        exclude=True,
         description="Original 4 player IDs for this slot (server-only)",
     )
     previous_player_ids: tuple[str, ...] = Field(

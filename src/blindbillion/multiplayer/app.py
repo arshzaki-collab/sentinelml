@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
-from typing import Annotated
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Annotated, Any
 
 import duckdb
 from fastapi import (
@@ -17,6 +19,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from blindbillion.data.db import DEFAULT_DB_PATH
@@ -63,12 +66,20 @@ def get_game_coordinator() -> GameCoordinator:
     return _coordinator
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Modern lifespan handler initializing database on application startup."""
+    init_db(get_engine())
+    yield
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application instance."""
     app = FastAPI(
         title="Blind Billion 2.0 Multiplayer API",
         version="2.0.0",
         description="Server-authoritative multiplayer backend with realtime synchronization.",
+        lifespan=lifespan,
     )
 
     allowed_origins_env = os.environ.get(
@@ -85,9 +96,34 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.on_event("startup")
-    def on_startup() -> None:
-        init_db(get_engine())
+    @app.get(
+        "/health",
+        status_code=status.HTTP_200_OK,
+        summary="Service health check",
+    )
+    def health_check(
+        db: Annotated[Session, Depends(get_db)],
+    ) -> dict[str, Any]:
+        """Verify database connectivity and analytical cache status."""
+        try:
+            db.execute(text("SELECT 1"))
+            db_status = "connected"
+        except Exception as exc:  # noqa: BLE001
+            db_status = f"unhealthy: {exc}"
+
+        try:
+            coordinator = get_game_coordinator()
+            duckdb_status = "connected" if coordinator.engine is not None else "uninitialized"
+        except Exception as exc:  # noqa: BLE001
+            duckdb_status = f"unhealthy: {exc}"
+
+        is_healthy = db_status == "connected" and duckdb_status == "connected"
+        return {
+            "status": "healthy" if is_healthy else "degraded",
+            "version": "2.0.0",
+            "database": db_status,
+            "analytical_cache": duckdb_status,
+        }
 
     @app.post(
         "/api/rooms",
