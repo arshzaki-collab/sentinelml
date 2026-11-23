@@ -5,40 +5,34 @@
 See: `.planning/PROJECT.md` | `.planning/REQUIREMENTS.md` | `.planning/ROADMAP.md`
 
 - **Core Value:** Server-authoritative multiplayer football financial strategy game powered by authentic 2016–2026 historical European football data, blind scouting with 3 hints, $1B budget, 3 transfer windows, and 3 AI personas.
-- **Current Focus:** Phase 3 Complete (Server-Authoritative Game Engine Core). Ready for Phase 4: AI Decision Engines (Rookie, Pro, Legend).
+- **Current Focus:** Phase 4 Complete (AI Decision Engines: Rookie, Pro, Legend). Ready for Phase 5: Multiplayer & Realtime Synchronization.
 
 ## Current Position
 
-- **Phase:** 03 of 07 (Server-Authoritative Game Engine Core) — COMPLETED
-- **Next Phase:** 04 of 07 (AI Decision Engines: Rookie, Pro, Legend)
-- **Status:** Verified, Tested (34 tests passing, 93% coverage), and Linters/Types Passing
+- **Phase:** 04 of 07 (AI Decision Engines: Rookie, Pro, Legend) — COMPLETED
+- **Next Phase:** 05 of 07 (Multiplayer & Realtime Synchronization)
+- **Status:** Verified, Tested (55 tests passing, 94% coverage), and Linters/Types Passing
 
-## Phase 3 Empirical Results & Engine Invariant Verification
+## Phase 4 Empirical Results & AI Invariant Verification
 
-1. **Server-Authoritative Game Engine (`src/blindbillion/engine/engine.py`):**
-   - Implements transactional, state-machine transitions across 11 discrete timeline steps (7 buying seasons, 3 transfer windows, 1 settlement).
-   - Strict immutability: operations accept a `GameState` and return a new `GameState` with incremented `state_version` and audit trail.
-   - Complete domain models (`models.py`) with `frozen=True` and custom domain exceptions (`exceptions.py`).
+1. **AI Difficulty Personas (`src/blindbillion/ai/evaluator.py`, `agent.py`):**
+   - **Rookie:** Evaluates primary visible counting stats, ignores age decline, uses Boltzmann exploration ($\tau = 1.5$) for probabilistic selection, and conducts occasional transfer window rebalancing (20% probability).
+   - **Pro:** Applies position-weighted statistical scoring, developmental age curve adjustments (youth appreciation boost vs aging penalty), cost-efficiency optimization, and target slot budget discipline.
+   - **Legend:** Implements multi-attribute utility theory with league tier coefficients, strict capital floor reservation ($B_{\text{remaining}} \ge (N_{\text{unfilled}} - 1) \times \$35\text{M}$), and resale arbitrage profit-taking in transfer windows.
 
-2. **Squad & Buying Invariants:**
-   - Enforces exactly 7 required slots: 2016 ST, 2017 WG, 2018 CM, 2020 CB, 2021 CM, 2023 CB, 2024 GK.
-   - Enforces exactly 4 anonymous candidates per slot generated from real historical Transfermarkt records.
-   - Anonymous scouting mask exposes exactly 3 position-specific hints and hides player IDs, names, clubs, and photos behind opaque UUID tokens.
-   - Rejects purchases outside the active buying season, purchases from other slots, duplicate player selections, and purchases exceeding available cash ($B_t \ge 0$).
+2. **Mathematical Temporal Isolation Barrier (`src/blindbillion/ai/temporal_guard.py`):**
+   - AI has zero direct database access. Operates strictly over `AIObservationContext` at $t \le T_{\text{current}}$.
+   - Secret player IDs, unrevealed names, and future performance/valuations are completely stripped from AI observation context.
+   - Proven by automated test: altering 2026 future valuations has zero effect on 2016–2018 AI decisions.
+   - Server-side replacement candidate filtering prevents any invalid or duplicate player selections.
 
-3. **Transfer Window Invariants (2019, 2022, 2025):**
-   - Strict temporal gating: transfers are rejected outside scheduled transfer windows.
-   - Historical pricing: selling credits the current window's valuation (July 1); buying a replacement debits that window's valuation.
-   - **Original Shortlist Restriction:** Replacements must come exclusively from the slot's original 4-player shortlist generated at game setup.
-   - Re-acquisition prevention: sold players cannot be repurchased for that slot.
+3. **Full 11-Step Game Autoplay & Crash Resilience:**
+   - All three AI difficulty levels successfully play complete 11-step games from 2016 through 2026 settlement.
+   - Concludes with 7 filled squad slots, non-negative cash ($B_t \ge 0$), and audited settlement records.
+   - Verified 100% crash-free autoplay across diverse random seeds (including edge seed 3).
 
-4. **2026 Valuation Settlement:**
-   - Final Net Worth = Remaining Cash + Sum of 2026 valuations of the 7 squad players.
-   - Queries authentic historical valuations within 180 days on or before July 1, 2026. Zero fabrication or interpolation.
-   - Comprehensive provenance attached to each player in `SettlementRecord`.
-
-5. **Quality & Test Metrics:**
-   - Total test suite: **34 passing tests** across 8 test suites.
-   - Engine tests: **11 comprehensive tests** covering buys, rejects, out-of-funds, transfer windows, shortlist replacement, 11-step complete game playthrough, and transactional integrity.
-   - Code coverage: **93% overall** (87% on `engine.py`, 100% on `models.py`, `exceptions.py`, `db.py`, `stats.py`, `valuations.py`).
-   - Linting & type checking: `ruff check` (0 errors), `ruff format` (clean), `mypy` (0 errors across 25 source files).
+4. **Quality & Test Metrics:**
+   - Total test suite: **55 passing tests** across 9 test suites.
+   - AI tests: **12 comprehensive tests** covering scoring differences, reproducibility with fixed seeds, budget constraints, insolvency fallbacks, temporal leakage, multi-seed crash resilience, and complete autoplay.
+   - Code coverage: **94% overall** (100% on `ai/models.py`, 98% on `ai/temporal_guard.py`, 99% on `ai/evaluator.py`, 90% on `ai/agent.py`).
+   - Linting & type checking: `ruff check` (0 errors), `ruff format` (clean), `mypy` (0 errors across 32 source files in strict mode).

@@ -61,11 +61,11 @@ The implementation is structured into seven disciplined, test-verified phases fo
 
 ### Phase 4: AI Decision Engines (Rookie, Pro, Legend)
 **Objective:** Develop three distinct AI personas with mathematical temporal isolation preventing future data leakage.
-- [ ] Task 4.1: Temporal isolation barrier: enforce read-only slice $t \le T_{\text{current}}$ on historical data for AI players.
-- [ ] Task 4.2: Rookie AI: greedy heuristics based on primary hints, randomized noise, naive budget allocation.
-- [ ] Task 4.3: Pro AI: value investing based on age curves, performance-to-cost ratios, and disciplined budget reservation.
-- [ ] Task 4.4: Legend AI: risk-adjusted portfolio optimization, league transition adjustment, and optimal stopping for transfer windows.
-- [ ] Task 4.5: AI benchmark suite: verify decision quality and guarantee zero future valuation leakage.
+- [x] Task 4.1: Temporal isolation barrier: enforce read-only slice $t \le T_{\text{current}}$ on historical data for AI players.
+- [x] Task 4.2: Rookie AI: greedy heuristics based on primary hints, randomized noise, naive budget allocation.
+- [x] Task 4.3: Pro AI: value investing based on age curves, performance-to-cost ratios, and disciplined budget reservation.
+- [x] Task 4.4: Legend AI: risk-adjusted portfolio optimization, league transition adjustment, and optimal stopping for transfer windows.
+- [x] Task 4.5: AI benchmark suite: verify decision quality and guarantee zero future valuation leakage.
 
 ### Phase 5: Multiplayer & Realtime Synchronization
 **Objective:** Build server-authoritative multiplayer room management, guest authentication, turn barriers, and reconnection resilience.
