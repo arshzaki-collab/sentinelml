@@ -40,6 +40,8 @@ logs/*.log
 logs/*.csv
 !logs/.gitkeep
 *.sqlite3
+*.duckdb
+*.duckdb.wal
 
 # Frontend
 frontend/node_modules/

@@ -1,0 +1,64 @@
+{
+  "pipeline_version": "2.0.0",
+  "started_at": "2026-11-23T18:05:59.785360+00:00",
+  "database_path": "data/blindbillion.duckdb",
+  "raw_directory": "data/raw",
+  "steps": {
+    "download": {
+      "source": "dcaribou/transfermarkt-datasets@r2 (https://pub-e682421888d945d684bcae8890b0ec20.r2.dev/data)",
+      "files": {
+        "competitions": "data/raw/competitions.csv.gz",
+        "games": "data/raw/games.csv.gz",
+        "clubs": "data/raw/clubs.csv.gz",
+        "players": "data/raw/players.csv.gz",
+        "appearances": "data/raw/appearances.csv.gz",
+        "player_valuations": "data/raw/player_valuations.csv.gz",
+        "club_games": "data/raw/club_games.csv.gz"
+      }
+    },
+    "ingestion": {
+      "raw_table_counts": {
+        "competitions": 65,
+        "games": 88958,
+        "clubs": 796,
+        "players": 50149,
+        "appearances": 1894350,
+        "player_valuations": 656301,
+        "club_games": 177916
+      }
+    },
+    "valuations": {
+      "total_materialized_observations": 205743,
+      "observations_by_year": {
+        "2016": 13775,
+        "2017": 16224,
+        "2018": 16921,
+        "2019": 19044,
+        "2020": 17083,
+        "2021": 22387,
+        "2022": 23540,
+        "2023": 23775,
+        "2024": 18500,
+        "2025": 17783,
+        "2026": 16711
+      }
+    },
+    "stats": {
+      "total_season_stats_rows": 78404
+    },
+    "eligibility": {
+      "candidates_per_slot": {
+        "Slot 1 (2016 ST)": 154,
+        "Slot 2 (2017 WG)": 171,
+        "Slot 3 (2018 CM)": 485,
+        "Slot 4 (2020 CB)": 447,
+        "Slot 5 (2021 CM)": 816,
+        "Slot 6 (2023 CB)": 718,
+        "Slot 7 (2024 GK)": 396
+      }
+    }
+  },
+  "completed_at": "2026-11-23T18:07:19.677242+00:00",
+  "duration_seconds": 79.891882,
+  "status": "SUCCESS"
+}

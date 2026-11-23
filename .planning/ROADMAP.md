@@ -43,12 +43,12 @@ The implementation is structured into seven disciplined, test-verified phases fo
 
 ### Phase 2: Historical Data Foundation & Ingestion Engine
 **Objective:** Build an automated, reproducible ETL pipeline with strict provenance, valuation filtering, and no-fabrication invariants.
-- [ ] Task 2.1: Domain models & schemas (`pydantic` entities, `sqlalchemy` tables for Players, Competitions, Games, Appearances, Valuations, Provenance).
-- [ ] Task 2.2: Fast DuckDB/SQLite ingestion pipeline with stream decompression, downloading and caching dataset tables.
-- [ ] Task 2.3: Valuation observation engine implementing the 180-day recency window and ECB currency conversion (EUR -> USD).
-- [ ] Task 2.4: Seasonal performance statistics aggregator (prior season goals, assists, clean sheets, UCL goals, cards, appearances).
-- [ ] Task 2.5: Integrity gates & data quarantine: exclude candidates without continuous or valid valuations, enforce zero-fabrication.
-- [ ] Task 2.6: Automated unit & integration tests for data foundation ($\ge 80\%$ coverage).
+- [x] Task 2.1: Domain models & schemas (`pydantic` entities, `DuckDB` tables for Players, Competitions, Games, Appearances, Valuations, Provenance).
+- [x] Task 2.2: Fast DuckDB ingestion pipeline with stream decompression, downloading and caching dataset tables.
+- [x] Task 2.3: Valuation observation engine implementing the 180-day recency window and ECB currency conversion (EUR -> USD).
+- [x] Task 2.4: Seasonal performance statistics aggregator (prior season goals, assists, clean sheets, UCL goals, cards, appearances).
+- [x] Task 2.5: Integrity gates & data quarantine: exclude candidates without continuous or valid valuations, enforce zero-fabrication.
+- [x] Task 2.6: Automated unit & integration tests for data foundation (23 tests passing, 93% coverage).
 
 ### Phase 3: Server-Authoritative Game Engine Core
 **Objective:** Implement the deterministic, tamper-proof state machine governing seasons, shortlists, purchases, transfer windows, and settlements.
