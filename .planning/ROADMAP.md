@@ -69,12 +69,12 @@ The implementation is structured into seven disciplined, test-verified phases fo
 
 ### Phase 5: Multiplayer & Realtime Synchronization
 **Objective:** Build server-authoritative multiplayer room management, guest authentication, turn barriers, and reconnection resilience.
-- [ ] Task 5.1: FastAPI server with WebSocket / Supabase Realtime channels and REST API endpoints.
-- [ ] Task 5.2: Room management: 4-character room codes (`[A-Z0-9]{4}`), 2–4 players, host privileges, guest sessions.
-- [ ] Task 5.3: Turn synchronization barrier: simultaneous turn submission, countdown timer, and automated AI turn execution.
-- [ ] Task 5.4: Reconnection & state recovery: persistent state in PostgreSQL/SQLite, session token restoration.
-- [ ] Task 5.5: Host migration protocol: seamless failover if room creator drops.
-- [ ] Task 5.6: Anti-cheat verification: reject client-side balance overrides or unauthorized actions.
+- [x] Task 5.1: FastAPI server with WebSocket / Supabase Realtime channels and REST API endpoints.
+- [x] Task 5.2: Room management: 4-character room codes (`[A-Z0-9]{4}`), 2–4 players, host privileges, guest sessions.
+- [x] Task 5.3: Turn synchronization barrier: simultaneous turn submission, countdown timer, and automated AI turn execution.
+- [x] Task 5.4: Reconnection & state recovery: persistent state in PostgreSQL/SQLite, session token restoration.
+- [x] Task 5.5: Host migration protocol: seamless failover if room creator drops.
+- [x] Task 5.6: Anti-cheat verification: reject client-side balance overrides or unauthorized actions.
 
 ### Phase 6: Cinematic Stadium UI & Visual Experience
 **Objective:** Create a modern, responsive web frontend with stadium aesthetics, tactical cards, dynamic charts, and accessible motion.

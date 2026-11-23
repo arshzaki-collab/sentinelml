@@ -108,6 +108,5 @@ class ShortlistSlot(BaseModel):
     candidates: list[ScoutingHints]  # Exactly 4 candidates
     secret_player_ids: list[str] = Field(
         default_factory=list,
-        exclude=True,
         description="Kept on server; index corresponds to candidates",
     )
