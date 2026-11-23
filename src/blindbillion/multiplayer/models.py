@@ -62,6 +62,16 @@ class SetReadyRequest(BaseModel):
     is_ready: bool = Field(..., description="Desired ready status")
 
 
+class AddAIPlayerRequest(BaseModel):
+    """Payload to add an AI opponent to a room lobby."""
+
+    model_config = ConfigDict(frozen=True)
+
+    difficulty: Literal["ROOKIE", "PRO", "LEGEND"] = Field(
+        default="PRO", description="AI difficulty profile"
+    )
+
+
 class MultiplayerGameActionRequest(BaseModel):
     """Payload to perform an action during buying season or transfer window."""
 
@@ -90,6 +100,8 @@ class PlayerPublicView(BaseModel):
     is_connected: bool
     is_turn_submitted: bool = False
     joined_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    is_ai: bool = False
+    ai_difficulty: str | None = None
 
 
 class RoomPublicView(BaseModel):

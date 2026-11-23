@@ -247,7 +247,10 @@ class GameCoordinator:
         state_model.updated_at = datetime.now(UTC)
         player.last_seen_at = datetime.now(UTC)
 
-        # 6. Check Round Barrier
+        # 6. Execute pending AI player turns
+        self._execute_pending_ai_turns(session=session, room=room)
+
+        # 7. Check Round Barrier
         all_submitted = all(p.is_turn_submitted for p in room.players)
         is_cleared = False
         if all_submitted:
@@ -282,6 +285,38 @@ class GameCoordinator:
         session.commit()
 
         return action_resp
+
+    def _execute_pending_ai_turns(self, session: Session, room: RoomModel) -> None:
+        """Autonomously execute turns for any AI players in the room who have not submitted."""
+        from blindbillion.ai.agent import AIAgent
+        from blindbillion.ai.models import AIDifficulty
+
+        for p in room.players:
+            if p.is_ai and not p.is_turn_submitted:
+                p_state_model = (
+                    session.query(PlayerGameStateModel)
+                    .filter(
+                        PlayerGameStateModel.room_code == room.room_code,
+                        PlayerGameStateModel.player_id == p.player_id,
+                    )
+                    .first()
+                )
+                if p_state_model:
+                    diff_val = (p.ai_difficulty or "PRO").upper()
+                    difficulty = (
+                        AIDifficulty(diff_val)
+                        if diff_val in AIDifficulty._value2member_map_
+                        else AIDifficulty.PRO
+                    )
+                    ai_agent = AIAgent(
+                        difficulty=difficulty,
+                        seed=f"{room.room_seed}_{p.player_id}_{room.timeline_step_index}",
+                    )
+                    p_state = GameState.model_validate_json(p_state_model.serialized_state)
+                    advanced = ai_agent.play_turn(state=p_state, engine=self.engine)
+                    p_state_model.serialized_state = advanced.model_dump_json()
+                    p_state_model.state_version += 1
+                    p.is_turn_submitted = True
 
     def _advance_room_timeline(self, session: Session, room: RoomModel) -> None:
         """Advance synchronized timeline for all players after barrier clearance."""

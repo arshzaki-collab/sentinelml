@@ -61,6 +61,8 @@ def serialize_room_view(room: RoomModel) -> RoomPublicView:
             is_connected=p.is_connected,
             is_turn_submitted=p.is_turn_submitted,
             joined_at=_ensure_utc(p.joined_at),
+            is_ai=p.is_ai,
+            ai_difficulty=p.ai_difficulty,
         )
         for p in sorted_players
     )
@@ -227,6 +229,96 @@ class RoomManager:
 
         player.is_ready = is_ready
         player.last_seen_at = datetime.now(UTC)
+        room.updated_at = datetime.now(UTC)
+        session.commit()
+        session.refresh(room)
+        return serialize_room_view(room)
+
+    @staticmethod
+    def add_ai_player(session: Session, room_code: str, difficulty: str = "PRO") -> RoomPublicView:
+        """Add an autonomous AI opponent to the lobby."""
+        clean_code = room_code.strip().upper()
+        clean_diff = difficulty.strip().upper()
+        if clean_diff not in ("ROOKIE", "PRO", "LEGEND"):
+            clean_diff = "PRO"
+
+        room = (
+            session.query(RoomModel)
+            .filter(RoomModel.room_code == clean_code)
+            .with_for_update()
+            .first()
+        )
+        if not room:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Room '{clean_code}' not found."
+            )
+
+        if room.status != RoomStatus.LOBBY.value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="AI players can only be added during LOBBY phase.",
+            )
+
+        if len(room.players) >= MAX_ROOM_PLAYERS:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Room is already full ({MAX_ROOM_PLAYERS} players max).",
+            )
+
+        ai_player_id = generate_player_id()
+        ai_session_token = generate_session_token()
+        now = datetime.now(UTC)
+
+        ai_player = RoomPlayerModel(
+            player_id=ai_player_id,
+            room_code=clean_code,
+            display_name=f"Bot ({clean_diff.capitalize()})",
+            session_token=ai_session_token,
+            is_host=False,
+            is_ready=True,
+            is_connected=True,
+            is_turn_submitted=False,
+            is_ai=True,
+            ai_difficulty=clean_diff,
+            joined_at=now,
+            last_seen_at=now,
+        )
+
+        session.add(ai_player)
+        room.updated_at = now
+        session.commit()
+        session.refresh(room)
+        return serialize_room_view(room)
+
+    @staticmethod
+    def remove_ai_player(session: Session, room_code: str, player_id: str) -> RoomPublicView:
+        """Remove an AI opponent from the lobby."""
+        clean_code = room_code.strip().upper()
+        room = (
+            session.query(RoomModel)
+            .filter(RoomModel.room_code == clean_code)
+            .with_for_update()
+            .first()
+        )
+        if not room:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Room '{clean_code}' not found."
+            )
+
+        if room.status != RoomStatus.LOBBY.value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="AI players can only be removed during LOBBY phase.",
+            )
+
+        target = next((p for p in room.players if p.player_id == player_id and p.is_ai), None)
+        if not target:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"AI player '{player_id}' not found in room.",
+            )
+
+        session.delete(target)
         room.updated_at = datetime.now(UTC)
         session.commit()
         session.refresh(room)

@@ -69,6 +69,8 @@ class RoomPlayerModel(Base):
     is_ready: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_connected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_turn_submitted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_ai: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    ai_difficulty: Mapped[str | None] = mapped_column(String(20), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(UTC)
     )

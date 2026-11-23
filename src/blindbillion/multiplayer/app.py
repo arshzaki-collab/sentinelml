@@ -28,6 +28,7 @@ from blindbillion.multiplayer.db_models import RoomModel, RoomPlayerModel
 from blindbillion.multiplayer.game_coordinator import GameCoordinator
 from blindbillion.multiplayer.models import (
     ActionResponse,
+    AddAIPlayerRequest,
     CreateRoomRequest,
     CreateRoomResponse,
     JoinRoomRequest,
@@ -199,6 +200,64 @@ def create_app() -> FastAPI:
                 "is_ready": payload.is_ready,
                 "room": updated_room.model_dump(mode="json"),
             },
+        )
+        return updated_room
+
+    @app.post(
+        "/api/rooms/{room_code}/ai",
+        response_model=RoomPublicView,
+        summary="Add an AI opponent to lobby (host only)",
+    )
+    async def add_ai_endpoint(
+        room_code: str,
+        payload: AddAIPlayerRequest,
+        session_token: Annotated[str, Depends(get_authenticated_player)],
+        db: Annotated[Session, Depends(get_db)],
+    ) -> RoomPublicView:
+        player = authenticate_player(session=db, session_token=session_token, room_code=room_code)
+        if not player.is_host:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the host can add AI opponents.",
+            )
+
+        updated_room = RoomManager.add_ai_player(
+            session=db, room_code=room_code, difficulty=payload.difficulty
+        )
+
+        await connection_manager.broadcast_to_room(
+            room_code=room_code,
+            event=RealtimeEventType.PLAYER_JOINED,
+            payload={"room": updated_room.model_dump(mode="json")},
+        )
+        return updated_room
+
+    @app.delete(
+        "/api/rooms/{room_code}/ai/{player_id}",
+        response_model=RoomPublicView,
+        summary="Remove an AI opponent from lobby (host only)",
+    )
+    async def remove_ai_endpoint(
+        room_code: str,
+        player_id: str,
+        session_token: Annotated[str, Depends(get_authenticated_player)],
+        db: Annotated[Session, Depends(get_db)],
+    ) -> RoomPublicView:
+        player = authenticate_player(session=db, session_token=session_token, room_code=room_code)
+        if not player.is_host:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the host can remove AI opponents.",
+            )
+
+        updated_room = RoomManager.remove_ai_player(
+            session=db, room_code=room_code, player_id=player_id
+        )
+
+        await connection_manager.broadcast_to_room(
+            room_code=room_code,
+            event=RealtimeEventType.PLAYER_DISCONNECTED,
+            payload={"player_id": player_id, "room": updated_room.model_dump(mode="json")},
         )
         return updated_room
 

@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS public.room_players (
     is_ready BOOLEAN NOT NULL DEFAULT FALSE,
     is_connected BOOLEAN NOT NULL DEFAULT TRUE,
     is_turn_submitted BOOLEAN NOT NULL DEFAULT FALSE,
+    is_ai BOOLEAN NOT NULL DEFAULT FALSE,
+    ai_difficulty VARCHAR(20),
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -111,7 +113,7 @@ CREATE POLICY "Service role full access on idempotency"
 
 -- Sanitized public view excluding session_token and secret identifiers
 CREATE OR REPLACE VIEW public.room_players_public AS
-    SELECT player_id, room_code, display_name, is_host, is_ready, is_connected, is_turn_submitted, joined_at
+    SELECT player_id, room_code, display_name, is_host, is_ready, is_connected, is_turn_submitted, is_ai, ai_difficulty, joined_at
     FROM public.room_players;
 
 -- ------------------------------------------------------------------------------
