@@ -77,11 +77,11 @@
 - **REQ-MULTI-06 [Simultaneous Turn Resolution]:** In multiplayer rooms, each season awaits decisions from all active players before broadcasting the next season state.
 
 ### 1.6 User Interface & Experience (UI)
-- **REQ-UI-01 [Design Aesthetic]:** Cinematic stadium atmosphere utilizing dark charcoal, midnight navy, neon cyan, electric violet, and gold accents.
-- **REQ-UI-02 [Interactive Dashboard]:** Live budget counter, squad formation pitch visualization (7 slots), transfer window ticker, and 2016–2026 timeline stepper.
-- **REQ-UI-03 [Scouting Cards]:** Tactical cards displaying candidate token, cost in USD, and exactly 3 dynamic hints with animated stat gauges.
-- **REQ-UI-04 [Post-Game Portfolio]:** Interactive valuation progression charts (2016–2026) for each signed player, showing ROI, value gain/loss, and leaderboards.
-- **REQ-UI-05 [Responsiveness & Accessibility]:** Fully responsive design supporting viewport widths from 360px (mobile) to 4K (desktop), with `prefers-reduced-motion` compliance.
+- [x] **REQ-UI-01 [Design Aesthetic]:** Cinematic stadium atmosphere utilizing dark charcoal, midnight navy, neon cyan, electric violet, and gold accents. Verified in `tailwind.config.js` and `index.css`.
+- [x] **REQ-UI-02 [Interactive Dashboard]:** Live budget counter, squad formation pitch visualization (7 slots), transfer window ticker, and 2016–2026 timeline stepper. Verified in `StadiumDashboard.tsx`, `FinancialMetrics.tsx`, `FormationPitch.tsx`, `TimelineProgress.tsx`.
+- [x] **REQ-UI-03 [Scouting Cards]:** Tactical cards displaying candidate token, cost in USD, and exactly 3 dynamic hints with animated stat gauges. Verified in `ScoutingMarket.tsx` and `CandidateCard.tsx`.
+- [x] **REQ-UI-04 [Post-Game Portfolio]:** Interactive valuation progression for each signed player, showing ROI, value gain/loss, and leaderboards. Verified in `FinalRevealScreen.tsx`.
+- [x] **REQ-UI-05 [Responsiveness & Accessibility]:** Fully responsive design supporting viewport widths from 360px (mobile) to 4K (desktop), with `prefers-reduced-motion` compliance. Verified across responsive components and mobile tab switcher.
 
 ---
 

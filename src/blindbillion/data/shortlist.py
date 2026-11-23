@@ -84,7 +84,7 @@ class ShortlistGenerator:
               AND stats.sub_position IN ({",".join(f"'{p}'" for p in sub_positions)})
               AND stats.appearances > 0
               AND val.converted_usd_value > 0
-            ORDER BY val.converted_usd_value DESC;
+            ORDER BY val.converted_usd_value DESC, stats.player_id ASC;
         """
 
         rows = self.con.execute(query, [buying_year]).fetchall()
@@ -134,8 +134,12 @@ class ShortlistGenerator:
         rng = random.Random(derived_seed)
 
         # Stratified selection into 4 distinct valuation tiers to ensure diverse financial options
-        # Sort by valuation descending
-        sorted_candidates = sorted(eligible, key=lambda c: float(str(c["cost_usd"])), reverse=True)
+        # Sort by valuation descending, tie-breaking deterministically on player_id string
+        sorted_candidates = sorted(
+            eligible,
+            key=lambda c: (float(str(c["cost_usd"])), str(c["player_id"])),
+            reverse=True,
+        )
         n = len(sorted_candidates)
         q = n // 4
 

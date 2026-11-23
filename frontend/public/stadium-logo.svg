@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="cyanGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00f0ff" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="45" stroke="url(#cyanGrad)" stroke-width="4" fill="#090d15" />
+  <path d="M50 15 L80 35 L80 65 L50 85 L20 65 L20 35 Z" stroke="#00f0ff" stroke-width="2" stroke-dasharray="4 2" fill="none" opacity="0.6"/>
+  <circle cx="50" cy="50" r="22" stroke="#8b5cf6" stroke-width="3" fill="#141c2e" />
+  <text x="50" y="58" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="24" fill="#00f0ff" text-anchor="middle">2.0</text>
+  <circle cx="50" cy="22" r="3" fill="#00f0ff" />
+  <circle cx="78" cy="40" r="3" fill="#00f0ff" />
+  <circle cx="78" cy="60" r="3" fill="#8b5cf6" />
+  <circle cx="50" cy="78" r="3" fill="#8b5cf6" />
+  <circle cx="22" cy="60" r="3" fill="#8b5cf6" />
+  <circle cx="22" cy="40" r="3" fill="#00f0ff" />
+</svg>

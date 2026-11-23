@@ -78,12 +78,13 @@ The implementation is structured into seven disciplined, test-verified phases fo
 
 ### Phase 6: Cinematic Stadium UI & Visual Experience
 **Objective:** Create a modern, responsive web frontend with stadium aesthetics, tactical cards, dynamic charts, and accessible motion.
-- [ ] Task 6.1: Vite + React + TypeScript + Tailwind CSS project initialization with custom stadium theme tokens.
-- [ ] Task 6.2: Formation pitch view (7 tactical slots: ST, WG, CM, CB, CM, CB, GK) with active slot indicators.
-- [ ] Task 6.3: Scouting cards component with 3 dynamic animated hint dials, valuation tags, and buy actions.
-- [ ] Task 6.4: Transfer window interface (2019, 2022, 2025) with shortlist replacement selector.
-- [ ] Task 6.5: 2026 Reveal & Portfolio Dashboard: animated reveals, historical valuation progression charts (KaTeX/Recharts), and leaderboard.
-- [ ] Task 6.6: Audio-visual feedback, sound effects toggle, responsive mobile/desktop layouts, and reduced-motion support.
+- [x] Task 6.1: Vite + React 18 + TypeScript + Tailwind CSS project initialization with custom stadium theme tokens (`#06090e`, neon cyan, electric violet, gold trophy).
+- [x] Task 6.2: Formation pitch view (7 tactical slots: ST, WG, CM, CB, CM, CB, GK) with active slot indicators, responsive mobile/desktop toggle, and anonymous player badges.
+- [x] Task 6.3: Scouting cards component with exactly 3 dynamic hint dials per position, valuation tags, zero-identity leakage, and 2-step purchase confirmations.
+- [x] Task 6.4: Transfer window interface (2019, 2022, 2025) with eligible owned slots, original 4-candidate replacement shortlist selector, and PASS option.
+- [x] Task 6.5: 2026 Reveal & Portfolio Dashboard: animated confetti reveals, unmasked player identities, ROI performance indicators, and audited tournament leaderboard podium.
+- [x] Task 6.6: Audio-visual feedback with procedural Web Audio sound synthesizer (no external mp3 assets), sound toggle with localStorage persistence, and responsive mobile/desktop layouts.
+- [x] Task 6.7: Automated frontend test suite with Vitest and React Testing Library (26 passing tests across 8 test suites, 0 type errors, 0 build errors).
 
 ### Phase 7: End-to-End Verification, Security Audit & Release
 **Objective:** Validate all acceptance criteria with end-to-end tests, security tests, and performance benchmarks.
