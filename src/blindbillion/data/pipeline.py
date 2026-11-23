@@ -136,9 +136,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--db-path", type=Path, default=DEFAULT_DB_PATH, help="Target DuckDB database path"
     )
-    parser.add_argument(
-        "--force", action="store_true", help="Force re-download of raw tables"
-    )
+    parser.add_argument("--force", action="store_true", help="Force re-download of raw tables")
 
     args = parser.parse_args()
     run_pipeline(raw_dir=args.raw_dir, db_path=args.db_path, force_download=args.force)

@@ -1,5 +1,7 @@
 """Domain models and data schemas for Blind Billion 2.0."""
 
+from __future__ import annotations
+
 from datetime import UTC, date, datetime
 from typing import Literal
 
@@ -104,4 +106,8 @@ class ShortlistSlot(BaseModel):
     buying_year: int
     position: PositionType
     candidates: list[ScoutingHints]  # Exactly 4 candidates
-    secret_player_ids: list[str]  # Kept on server; index corresponds to candidates
+    secret_player_ids: list[str] = Field(
+        default_factory=list,
+        exclude=True,
+        description="Kept on server; index corresponds to candidates",
+    )

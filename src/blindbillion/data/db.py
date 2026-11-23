@@ -77,19 +77,22 @@ class DuckDBManager:
             row_count: int = row_count_res[0] if row_count_res else 0
 
             # Record provenance log
-            con.execute("""
+            con.execute(
+                """
                 INSERT INTO ingestion_runs (
                     run_id, table_name, source_path, data_source, row_count, status, imported_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?);
-            """, [
-                actual_run_id,
-                raw_table,
-                csv_path_str,
-                data_source,
-                row_count,
-                "SUCCESS",
-                datetime.now(UTC),
-            ])
+            """,
+                [
+                    actual_run_id,
+                    raw_table,
+                    csv_path_str,
+                    data_source,
+                    row_count,
+                    "SUCCESS",
+                    datetime.now(UTC),
+                ],
+            )
 
             logger.info("Imported %d rows into %s", row_count, raw_table)
             return row_count

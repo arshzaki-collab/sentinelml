@@ -27,12 +27,14 @@ def test_run_pipeline_isolated(tmp_path: Path) -> None:
             if tbl == "competitions":
                 gz.write("competition_id,name\nGB1,Premier League\n")
             elif tbl == "players":
-                gz.write("player_id,name,position,sub_position,date_of_birth,"
-                         "current_club_domestic_competition_id\n"
-                         "P1,Striker 1,Attack,Centre-Forward,1990-01-01,GB1\n"
-                         "P2,Striker 2,Attack,Centre-Forward,1992-01-01,GB1\n"
-                         "P3,Striker 3,Attack,Centre-Forward,1993-01-01,GB1\n"
-                         "P4,Striker 4,Attack,Centre-Forward,1994-01-01,GB1\n")
+                gz.write(
+                    "player_id,name,position,sub_position,date_of_birth,"
+                    "current_club_domestic_competition_id\n"
+                    "P1,Striker 1,Attack,Centre-Forward,1990-01-01,GB1\n"
+                    "P2,Striker 2,Attack,Centre-Forward,1992-01-01,GB1\n"
+                    "P3,Striker 3,Attack,Centre-Forward,1993-01-01,GB1\n"
+                    "P4,Striker 4,Attack,Centre-Forward,1994-01-01,GB1\n"
+                )
             elif tbl == "player_valuations":
                 header = (
                     "player_id,date,market_value_in_eur,current_club_id,"
@@ -51,7 +53,9 @@ def test_run_pipeline_isolated(tmp_path: Path) -> None:
                 lines = [app_hdr]
                 for pid in ("P1", "P2", "P3", "P4"):
                     for yr in range(2016, 2027):
-                        lines.append(f"APP_{pid}_{yr},{pid},G_{yr},{yr}-03-01,GB1,10,2,1,0,90,CLUB_A\n")
+                        lines.append(
+                            f"APP_{pid}_{yr},{pid},G_{yr},{yr}-03-01,GB1,10,2,1,0,90,CLUB_A\n"
+                        )
                 gz.writelines(lines)
             elif tbl == "games":
                 lines = ["game_id,home_club_id,away_club_id,home_club_goals,away_club_goals\n"]

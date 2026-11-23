@@ -107,6 +107,7 @@ def test_hints_position_rules() -> None:
         "ucl_goals": 2,
     }
     import random
+
     rng = random.Random(42)
 
     cm_hints = ShortlistGenerator._build_position_hints(mock_player, position="CM", rng=rng)

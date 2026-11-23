@@ -41,6 +41,7 @@ def test_download_table_fetches_stream(tmp_path: Path) -> None:
 
     # Create dummy gzipped bytes
     import io
+
     buf = io.BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb") as gz:
         gz.write(b"competition_id,name\nGB1,Premier League\n")

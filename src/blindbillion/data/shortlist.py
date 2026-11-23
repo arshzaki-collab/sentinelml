@@ -54,7 +54,7 @@ class ShortlistGenerator:
                     player_id,
                     COUNT(DISTINCT reference_year) AS covered_milestones
                 FROM player_annual_valuations
-                WHERE reference_year IN ({','.join(str(y) for y in required_milestone_years)})
+                WHERE reference_year IN ({",".join(str(y) for y in required_milestone_years)})
                 GROUP BY player_id
                 HAVING COUNT(DISTINCT reference_year) = {required_milestones_count}
             )
@@ -81,7 +81,7 @@ class ShortlistGenerator:
               ON stats.player_id = val.player_id
              AND stats.season_year = val.reference_year
             WHERE stats.season_year = ?
-              AND stats.sub_position IN ({','.join(f"'{p}'" for p in sub_positions)})
+              AND stats.sub_position IN ({",".join(f"'{p}'" for p in sub_positions)})
               AND stats.appearances > 0
               AND val.converted_usd_value > 0
             ORDER BY val.converted_usd_value DESC;
@@ -89,10 +89,21 @@ class ShortlistGenerator:
 
         rows = self.con.execute(query, [buying_year]).fetchall()
         columns = [
-            "player_id", "player_name", "sub_position", "age_at_reference",
-            "domestic_league_code", "domestic_league_name", "appearances",
-            "goals", "assists", "total_cards", "clean_sheets", "ucl_appearances",
-            "ucl_goals", "cost_usd", "cost_eur"
+            "player_id",
+            "player_name",
+            "sub_position",
+            "age_at_reference",
+            "domestic_league_code",
+            "domestic_league_name",
+            "appearances",
+            "goals",
+            "assists",
+            "total_cards",
+            "clean_sheets",
+            "ucl_appearances",
+            "ucl_goals",
+            "cost_usd",
+            "cost_eur",
         ]
 
         return [dict(zip(columns, r, strict=True)) for r in rows]
@@ -124,9 +135,7 @@ class ShortlistGenerator:
 
         # Stratified selection into 4 distinct valuation tiers to ensure diverse financial options
         # Sort by valuation descending
-        sorted_candidates = sorted(
-            eligible, key=lambda c: float(str(c["cost_usd"])), reverse=True
-        )
+        sorted_candidates = sorted(eligible, key=lambda c: float(str(c["cost_usd"])), reverse=True)
         n = len(sorted_candidates)
         q = n // 4
 

@@ -52,12 +52,12 @@ The implementation is structured into seven disciplined, test-verified phases fo
 
 ### Phase 3: Server-Authoritative Game Engine Core
 **Objective:** Implement the deterministic, tamper-proof state machine governing seasons, shortlists, purchases, transfer windows, and settlements.
-- [ ] Task 3.1: Game state models & immutable action transitions (GameSession, PlayerState, SquadSlot, TransactionHistory).
-- [ ] Task 3.2: Shortlist generator: exactly 4 candidates per slot (ST 2016, WG 2017, CM 2018, CB 2020, CM 2021, CB 2023, GK 2024).
-- [ ] Task 3.3: Anonymous scouting masking engine: generates the exact 3-hint payload per position; strips names, photos, clubs, IDs.
-- [ ] Task 3.4: Transfer window logic (2019, 2022, 2025): sale validation, replacement strictly restricted to original 4-player shortlist.
-- [ ] Task 3.5: Financial engine & solvency invariants ($1B starting budget, non-negative cash enforcement, 2026 settlement calculation).
-- [ ] Task 3.6: Exhaustive game engine unit tests ($\ge 85\%$ coverage).
+- [x] Task 3.1: Game state models & immutable action transitions (GameSession, PlayerState, SquadSlot, TransactionHistory).
+- [x] Task 3.2: Shortlist generator: exactly 4 candidates per slot (ST 2016, WG 2017, CM 2018, CB 2020, CM 2021, CB 2023, GK 2024).
+- [x] Task 3.3: Anonymous scouting masking engine: generates the exact 3-hint payload per position; strips names, photos, clubs, IDs.
+- [x] Task 3.4: Transfer window logic (2019, 2022, 2025): sale validation, replacement strictly restricted to original 4-player shortlist.
+- [x] Task 3.5: Financial engine & solvency invariants ($1B starting budget, non-negative cash enforcement, 2026 settlement calculation).
+- [x] Task 3.6: Exhaustive game engine unit tests ($\ge 85\%$ coverage).
 
 ### Phase 4: AI Decision Engines (Rookie, Pro, Legend)
 **Objective:** Develop three distinct AI personas with mathematical temporal isolation preventing future data leakage.

@@ -23,9 +23,7 @@ SQUAD_SLOTS: Final[tuple[dict[str, object], ...]] = (
 )
 
 # Reference Dates: July 1 of each year from 2016 through 2026
-REFERENCE_DATES: Final[dict[int, date]] = {
-    year: date(year, 7, 1) for year in range(2016, 2027)
-}
+REFERENCE_DATES: Final[dict[int, date]] = {year: date(year, 7, 1) for year in range(2016, 2027)}
 
 # European Central Bank (ECB) Official EUR/USD Foreign Exchange Reference Rates (July 1)
 ECB_EUR_USD_RATES: Final[dict[int, float]] = {
@@ -57,20 +55,20 @@ CORE_TABLE_FILES: Final[dict[str, str]] = {
 
 # European League Competition Codes
 EUROPEAN_TOP_FLIGHT_LEAGUES: Final[tuple[str, ...]] = (
-    "GB1",   # Premier League (England)
-    "ES1",   # La Liga (Spain)
-    "IT1",   # Serie A (Italy)
-    "L1",    # Bundesliga (Germany)
-    "FR1",   # Ligue 1 (France)
-    "PO1",   # Liga Portugal (Portugal)
-    "NL1",   # Eredivisie (Netherlands)
-    "BE1",   # Jupiler Pro League (Belgium)
-    "SC1",   # Scottish Premiership (Scotland)
-    "TR1",   # Super Lig (Turkey)
+    "GB1",  # Premier League (England)
+    "ES1",  # La Liga (Spain)
+    "IT1",  # Serie A (Italy)
+    "L1",  # Bundesliga (Germany)
+    "FR1",  # Ligue 1 (France)
+    "PO1",  # Liga Portugal (Portugal)
+    "NL1",  # Eredivisie (Netherlands)
+    "BE1",  # Jupiler Pro League (Belgium)
+    "SC1",  # Scottish Premiership (Scotland)
+    "TR1",  # Super Lig (Turkey)
 )
 
 UEFA_COMPETITIONS: Final[tuple[str, ...]] = (
-    "CL",    # UEFA Champions League
-    "EL",    # UEFA Europa League
+    "CL",  # UEFA Champions League
+    "EL",  # UEFA Europa League
     "UCOL",  # UEFA Conference League
 )

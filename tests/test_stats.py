@@ -94,11 +94,11 @@ def test_stats_aggregator() -> None:
     assert res[1] == 2016
     assert res[2] == "Test Striker"
     assert res[3] == 26  # Born Jan 1990 -> Age 26 on July 1, 2016
-    assert res[4] == 2   # 2 appearances
-    assert res[5] == 2   # 1 league + 1 UCL goal
-    assert res[6] == 1   # 1 assist
-    assert res[7] == 1   # 1 yellow card
-    assert res[8] == 1   # 1 clean sheet (G1: opponent scored 0)
-    assert res[9] == 1   # 1 UCL goal
+    assert res[4] == 2  # 2 appearances
+    assert res[5] == 2  # 1 league + 1 UCL goal
+    assert res[6] == 1  # 1 assist
+    assert res[7] == 1  # 1 yellow card
+    assert res[8] == 1  # 1 clean sheet (G1: opponent scored 0)
+    assert res[9] == 1  # 1 UCL goal
     assert res[10] == 1  # 1 UCL appearance
     assert res[11] == "Premier League"

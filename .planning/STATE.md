@@ -5,63 +5,40 @@
 See: `.planning/PROJECT.md` | `.planning/REQUIREMENTS.md` | `.planning/ROADMAP.md`
 
 - **Core Value:** Server-authoritative multiplayer football financial strategy game powered by authentic 2016–2026 historical European football data, blind scouting with 3 hints, $1B budget, 3 transfer windows, and 3 AI personas.
-- **Current Focus:** Phase 2 Complete (Historical Data Foundation & Ingestion Engine). Ready for Phase 3: Server-Authoritative Game Engine Core.
+- **Current Focus:** Phase 3 Complete (Server-Authoritative Game Engine Core). Ready for Phase 4: AI Decision Engines (Rookie, Pro, Legend).
 
 ## Current Position
 
-- **Phase:** 02 of 07 (Historical Data Foundation & Ingestion Engine) — COMPLETED
-- **Next Phase:** 03 of 07 (Server-Authoritative Game Engine Core)
-- **Status:** Verified, Tested (23 tests passing, 93% coverage), and Idempotent
+- **Phase:** 03 of 07 (Server-Authoritative Game Engine Core) — COMPLETED
+- **Next Phase:** 04 of 07 (AI Decision Engines: Rookie, Pro, Legend)
+- **Status:** Verified, Tested (34 tests passing, 93% coverage), and Linters/Types Passing
 
-## Phase 2 Empirical Results & Data Invariant Verification
+## Phase 3 Empirical Results & Engine Invariant Verification
 
-1. **Raw Ingestion into `data/blindbillion.duckdb`:**
-   - Provider: `TransfermarktR2Provider` (`dcaribou/transfermarkt-datasets@r2`)
-   - `raw_competitions`: 65 rows
-   - `raw_games`: 88,958 rows
-   - `raw_clubs`: 796 rows
-   - `raw_players`: 50,149 rows
-   - `raw_appearances`: 1,894,350 rows
-   - `raw_player_valuations`: 656,301 rows
-   - `raw_club_games`: 177,916 rows
-   - Total Raw Records Ingested: **2,868,535 rows**
-2. **Materialized Historical Annual Valuations (`player_annual_valuations`):**
-   - Observations strictly within 180-day window on or before July 1 (2016–2026): **205,743 rows**
-   - Currency Conversion: EUR converted to USD using official European Central Bank (ECB) reference rates.
-   - Traceability: 100% of rows contain original currency, original value, converted USD, valuation date, reference date, observation age, exchange rate source, and import timestamp.
-   - Annual breakdown:
-     - 2016: 13,775
-     - 2017: 16,224
-     - 2018: 16,921
-     - 2019: 19,044
-     - 2020: 17,083
-     - 2021: 22,387
-     - 2022: 23,540
-     - 2023: 23,775
-     - 2024: 18,500
-     - 2025: 17,783
-     - 2026: 16,711
-   - Zero missing value fabrication; zero silent interpolation.
-3. **Materialized Seasonal Statistics (`player_season_stats`):**
-   - Total player-season records: **78,404 rows**
-   - Aggregates trailing 12-month domestic and continental statistics: appearances, minutes, goals, assists, yellow cards, red cards, clean sheets (team conceded 0 goals), UCL appearances, and UCL goals.
-4. **Candidate Pool Eligibility & Shortlist Generation:**
-   - Candidate pool size per slot (strictly satisfying position match, valid valuation, prior season appearances, and continuous valuations across all subsequent milestones through 2026):
-     - Slot 1 (2016 ST): 154 eligible candidates
-     - Slot 2 (2017 WG): 171 eligible candidates
-     - Slot 3 (2018 CM): 485 eligible candidates
-     - Slot 4 (2020 CB): 447 eligible candidates
-     - Slot 5 (2021 CM): 816 eligible candidates
-     - Slot 6 (2023 CB): 718 eligible candidates
-     - Slot 7 (2024 GK): 396 eligible candidates
-   - Deterministic 4-candidate shortlist generator implemented in `src/blindbillion/data/shortlist.py`.
-   - Anonymous 3-hint obfuscation veil strictly complies with position rules:
-     - ST/WG: Goals compulsory + 2 of {Age, Assists, League, UCL Goals}
-     - CM: Assists compulsory + 2 of {Age, Goals, Cards, League}
-     - CB: Clean Sheets compulsory + 2 of {Age, Goals, Cards, League}
-     - GK: Clean Sheets, Age, League
-   - Client security: Player IDs, names, clubs, and photos are completely stripped from client payloads; candidates are assigned opaque UUID tokens.
+1. **Server-Authoritative Game Engine (`src/blindbillion/engine/engine.py`):**
+   - Implements transactional, state-machine transitions across 11 discrete timeline steps (7 buying seasons, 3 transfer windows, 1 settlement).
+   - Strict immutability: operations accept a `GameState` and return a new `GameState` with incremented `state_version` and audit trail.
+   - Complete domain models (`models.py`) with `frozen=True` and custom domain exceptions (`exceptions.py`).
+
+2. **Squad & Buying Invariants:**
+   - Enforces exactly 7 required slots: 2016 ST, 2017 WG, 2018 CM, 2020 CB, 2021 CM, 2023 CB, 2024 GK.
+   - Enforces exactly 4 anonymous candidates per slot generated from real historical Transfermarkt records.
+   - Anonymous scouting mask exposes exactly 3 position-specific hints and hides player IDs, names, clubs, and photos behind opaque UUID tokens.
+   - Rejects purchases outside the active buying season, purchases from other slots, duplicate player selections, and purchases exceeding available cash ($B_t \ge 0$).
+
+3. **Transfer Window Invariants (2019, 2022, 2025):**
+   - Strict temporal gating: transfers are rejected outside scheduled transfer windows.
+   - Historical pricing: selling credits the current window's valuation (July 1); buying a replacement debits that window's valuation.
+   - **Original Shortlist Restriction:** Replacements must come exclusively from the slot's original 4-player shortlist generated at game setup.
+   - Re-acquisition prevention: sold players cannot be repurchased for that slot.
+
+4. **2026 Valuation Settlement:**
+   - Final Net Worth = Remaining Cash + Sum of 2026 valuations of the 7 squad players.
+   - Queries authentic historical valuations within 180 days on or before July 1, 2026. Zero fabrication or interpolation.
+   - Comprehensive provenance attached to each player in `SettlementRecord`.
+
 5. **Quality & Test Metrics:**
-   - Test suite: 23 passing tests in `tests/`.
-   - Coverage: **93%** across all source modules.
-   - Linters: `ruff` 0 errors, `mypy` strict mode 0 errors.
+   - Total test suite: **34 passing tests** across 8 test suites.
+   - Engine tests: **11 comprehensive tests** covering buys, rejects, out-of-funds, transfer windows, shortlist replacement, 11-step complete game playthrough, and transactional integrity.
+   - Code coverage: **93% overall** (87% on `engine.py`, 100% on `models.py`, `exceptions.py`, `db.py`, `stats.py`, `valuations.py`).
+   - Linting & type checking: `ruff check` (0 errors), `ruff format` (clean), `mypy` (0 errors across 25 source files).
