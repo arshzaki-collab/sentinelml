@@ -1,0 +1,24 @@
+{
+  "project_name": "blindbillion",
+  "version": "2.0.0",
+  "status": "in_progress",
+  "current_phase": "01",
+  "next_phase": "02",
+  "data_provider": "transfermarkt-datasets-r2",
+  "currency_source": "ECB",
+  "timeline": {
+    "start_year": 2016,
+    "end_year": 2026,
+    "starting_budget_usd": 1000000000,
+    "transfer_windows": [2019, 2022, 2025],
+    "squad_slots": [
+      {"year": 2016, "position": "ST"},
+      {"year": 2017, "position": "WG"},
+      {"year": 2018, "position": "CM"},
+      {"year": 2020, "position": "CB"},
+      {"year": 2021, "position": "CM"},
+      {"year": 2023, "position": "CB"},
+      {"year": 2024, "position": "GK"}
+    ]
+  }
+}

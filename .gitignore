@@ -1,0 +1,60 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing & Linting cache
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.coverage.*
+
+# Data & Datasets (never commit raw bulk datasets)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Model Binaries & Artifacts
+models/*.joblib
+models/*.onnx
+!models/.gitkeep
+
+# Runtime Telemetry Logs & DBs
+logs/*.log
+logs/*.csv
+!logs/.gitkeep
+*.sqlite3
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# macOS / OS artifacts
+.DS_Store
+
+# Legacy Archive
+archive_legacy/
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

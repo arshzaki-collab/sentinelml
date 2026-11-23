@@ -1,0 +1,22 @@
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+]
+ignore = []
+
+[lint.isort]
+known-first-party = ["sentinelml"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
