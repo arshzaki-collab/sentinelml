@@ -13,6 +13,8 @@ import React, {
 import {
   ActionResponse,
   AIDifficulty,
+  CreateRoomResponse,
+  JoinRoomResponse,
   LeaderboardEntry,
   PlayerGameStateView,
   RoomGameStateResponse,
@@ -34,8 +36,13 @@ interface GameContextType {
   error: string | null;
   notification: string | null;
   isConnected: boolean;
-  createRoom: (hostName: string, seed?: string) => Promise<void>;
-  joinRoom: (roomCode: string, playerName: string) => Promise<void>;
+  createRoom: (hostName: string, seed?: string) => Promise<CreateRoomResponse>;
+  joinRoom: (roomCode: string, playerName: string) => Promise<JoinRoomResponse>;
+  startSinglePlayer: (
+    playerName: string,
+    difficulty?: AIDifficulty,
+    aiOpponentsCount?: number
+  ) => Promise<void>;
   toggleReady: (isReady: boolean) => Promise<void>;
   addAI: (difficulty: AIDifficulty) => Promise<void>;
   removeAI: (targetPlayerId: string) => Promise<void>;
@@ -73,11 +80,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
   const wsClientRef = useRef<GameWebSocketClient | null>(null);
+  const roomRef = useRef<RoomPublicView | null>(null);
+  const sessionTokenRef = useRef<string | null>(sessionToken);
+  const roomCodeRef = useRef<string | null>(roomCode);
+
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
+
+  useEffect(() => {
+    sessionTokenRef.current = sessionToken;
+  }, [sessionToken]);
+
+  useEffect(() => {
+    roomCodeRef.current = roomCode;
+  }, [roomCode]);
 
   const clearSession = useCallback(() => {
     sessionStorage.removeItem("bb_session_token");
     sessionStorage.removeItem("bb_player_id");
     sessionStorage.removeItem("bb_room_code");
+    sessionTokenRef.current = null;
+    roomCodeRef.current = null;
+    roomRef.current = null;
     setSessionToken(null);
     setPlayerId(null);
     setRoomCode(null);
@@ -90,22 +115,63 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const refreshState = useCallback(async () => {
-    if (!roomCode || !sessionToken) return;
+  const fetchRoom = useCallback(async (code: string): Promise<RoomPublicView> => {
     try {
-      const resp: RoomGameStateResponse = await api.getGameState(roomCode, sessionToken);
+      const publicRoom = await api.getRoom(code);
+      setRoom(publicRoom);
+      return publicRoom;
+    } catch (err) {
+      console.warn("Failed to fetch room:", err);
+      if (err instanceof ApiError && err.status === 404) {
+        // Room no longer exists on server
+        clearSession();
+      }
+      throw err;
+    }
+  }, [clearSession]);
+
+  const fetchGameState = useCallback(async (code: string, token: string): Promise<RoomGameStateResponse> => {
+    try {
+      const resp: RoomGameStateResponse = await api.getGameState(code, token);
       setRoom(resp.room);
       setMyState(resp.my_state);
       if (resp.leaderboard) {
         setLeaderboard(resp.leaderboard);
       }
+      return resp;
     } catch (err) {
-      console.warn("Failed to refresh state:", err);
-      if (err instanceof ApiError && (err.status === 401 || err.status === 404)) {
+      console.warn("Failed to fetch game state:", err);
+      if (err instanceof ApiError && err.status === 401) {
+        // Confirmed invalid or expired session token
         clearSession();
       }
+      // Note: 404 on game state (e.g. before start) does NOT clear the session!
+      throw err;
     }
-  }, [roomCode, sessionToken, clearSession]);
+  }, [clearSession]);
+
+  const refreshState = useCallback(async () => {
+    if (!roomCode) return;
+    try {
+      let currentRoom = roomRef.current;
+      if (!currentRoom) {
+        currentRoom = await fetchRoom(roomCode);
+      }
+
+      if (currentRoom.status === "LOBBY") {
+        // In LOBBY: refresh public room view only, never request private game state
+        await fetchRoom(roomCode);
+        return;
+      }
+
+      // In IN_GAME or COMPLETED: refresh authoritative player game state
+      if (sessionToken) {
+        await fetchGameState(roomCode, sessionToken);
+      }
+    } catch (err) {
+      console.warn("Failed to refresh state:", err);
+    }
+  }, [roomCode, sessionToken, fetchRoom, fetchGameState]);
 
   // Connect WebSocket when roomCode and sessionToken are present
   useEffect(() => {
@@ -120,38 +186,70 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const ws = new GameWebSocketClient(roomCode, sessionToken);
     wsClientRef.current = ws;
-    ws.connect();
-    setIsConnected(true);
 
-    const unsub = ws.on("*", (event: WebSocketEvent) => {
+    // Track connection state based strictly on real WebSocket lifecycle events
+    const unsubStatus = ws.onConnectionStatus((connected) => {
+      setIsConnected(connected);
+    });
+
+    ws.connect();
+
+    const unsubEvents = ws.on("*", (event: WebSocketEvent) => {
       switch (event.event) {
         case "PLAYER_JOINED":
         case "PLAYER_LEFT":
         case "PLAYER_READY":
         case "PLAYER_DISCONNECTED":
         case "PLAYER_RECONNECTED":
-        case "HOST_MIGRATED":
-          refreshState();
+        case "HOST_MIGRATED": {
+          const payload = event.payload as Record<string, any> | undefined;
+          const currentStatus = roomRef.current?.status;
+          if (!currentStatus || currentStatus === "LOBBY") {
+            if (payload?.room) {
+              setRoom(payload.room);
+            } else if (roomCode) {
+              fetchRoom(roomCode).catch(() => {});
+            }
+          } else if (roomCode && sessionToken) {
+            fetchGameState(roomCode, sessionToken).catch(() => {});
+          }
           break;
+        }
 
-        case "GAME_STARTED":
+        case "GAME_STARTED": {
           soundManager.playWhistle();
-          refreshState();
+          const payload = event.payload as Record<string, any> | undefined;
+          if (payload?.room) {
+            setRoom(payload.room);
+          }
+          if (roomCode && sessionToken) {
+            fetchGameState(roomCode, sessionToken).catch(() => {});
+          }
           break;
+        }
 
-        case "ACTION_COMMITTED":
-          refreshState();
+        case "ACTION_COMMITTED": {
+          if (roomCode && sessionToken) {
+            fetchGameState(roomCode, sessionToken).catch(() => {});
+          }
           break;
+        }
 
-        case "ROUND_ADVANCED":
+        case "ROUND_ADVANCED": {
           soundManager.playWhistle();
-          refreshState();
+          if (roomCode && sessionToken) {
+            fetchGameState(roomCode, sessionToken).catch(() => {});
+          }
           break;
+        }
 
-        case "GAME_FINISHED":
+        case "GAME_FINISHED": {
           soundManager.playFanfare();
-          refreshState();
+          if (roomCode && sessionToken) {
+            fetchGameState(roomCode, sessionToken).catch(() => {});
+          }
           break;
+        }
 
         default:
           break;
@@ -159,20 +257,29 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
-      unsub();
+      unsubEvents();
+      unsubStatus();
       ws.disconnect();
       setIsConnected(false);
     };
-  }, [roomCode, sessionToken, refreshState]);
+  }, [roomCode, sessionToken, fetchRoom, fetchGameState]);
 
   // Initial restoration on page load
   useEffect(() => {
-    if (roomCode && sessionToken && !myState) {
-      refreshState();
+    if (roomCode && sessionToken && !roomRef.current) {
+      fetchRoom(roomCode)
+        .then((publicRoom) => {
+          if (publicRoom.status !== "LOBBY") {
+            return fetchGameState(roomCode, sessionToken);
+          }
+        })
+        .catch((err) => {
+          console.warn("Initial room restoration error:", err);
+        });
     }
-  }, [roomCode, sessionToken, myState, refreshState]);
+  }, [roomCode, sessionToken, fetchRoom, fetchGameState]);
 
-  const createRoom = async (hostName: string, seed?: string) => {
+  const createRoom = async (hostName: string, seed?: string): Promise<CreateRoomResponse> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -181,10 +288,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.setItem("bb_session_token", resp.session_token);
       sessionStorage.setItem("bb_player_id", resp.player_id);
       sessionStorage.setItem("bb_room_code", resp.room.room_code);
+      sessionTokenRef.current = resp.session_token;
+      roomCodeRef.current = resp.room.room_code;
+      roomRef.current = resp.room;
       setSessionToken(resp.session_token);
       setPlayerId(resp.player_id);
       setRoomCode(resp.room.room_code);
       setRoom(resp.room);
+      return resp;
     } catch (err) {
       soundManager.playError();
       const msg = err instanceof ApiError ? err.message : "Failed to create room";
@@ -195,7 +306,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const joinRoom = async (code: string, playerName: string) => {
+  const joinRoom = async (code: string, playerName: string): Promise<JoinRoomResponse> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -204,10 +315,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionStorage.setItem("bb_session_token", resp.session_token);
       sessionStorage.setItem("bb_player_id", resp.player_id);
       sessionStorage.setItem("bb_room_code", resp.room.room_code);
+      sessionTokenRef.current = resp.session_token;
+      roomCodeRef.current = resp.room.room_code;
+      roomRef.current = resp.room;
       setSessionToken(resp.session_token);
       setPlayerId(resp.player_id);
       setRoomCode(resp.room.room_code);
       setRoom(resp.room);
+      return resp;
     } catch (err) {
       soundManager.playError();
       const msg = err instanceof ApiError ? err.message : "Failed to join room";
@@ -218,11 +333,68 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const toggleReady = async (isReady: boolean) => {
-    if (!roomCode || !sessionToken) return;
+  const startSinglePlayer = async (
+    playerName: string,
+    difficulty: AIDifficulty = "PRO",
+    aiOpponentsCount: number = 2
+  ): Promise<void> => {
+    setIsLoading(true);
+    setError(null);
     try {
       soundManager.playClick();
-      const updated = await api.setReady(roomCode, sessionToken, isReady);
+      // 1. Create Room
+      const createResp = await api.createRoom(playerName.trim() || "Chief Scout");
+      const code = createResp.room.room_code;
+      const token = createResp.session_token;
+
+      sessionStorage.setItem("bb_session_token", token);
+      sessionStorage.setItem("bb_player_id", createResp.player_id);
+      sessionStorage.setItem("bb_room_code", code);
+
+      sessionTokenRef.current = token;
+      roomCodeRef.current = code;
+      roomRef.current = createResp.room;
+
+      setSessionToken(token);
+      setPlayerId(createResp.player_id);
+      setRoomCode(code);
+      setRoom(createResp.room);
+
+      // 2. Add AI opponents sequentially using direct credentials
+      let latestRoom = createResp.room;
+      for (let i = 0; i < aiOpponentsCount; i++) {
+        latestRoom = await api.addAIOpponent(code, token, difficulty);
+        roomRef.current = latestRoom;
+        setRoom(latestRoom);
+      }
+
+      // 3. Immediately start game
+      soundManager.playWhistle();
+      const startResp = await api.startGame(code, token);
+      roomRef.current = startResp.room;
+      setRoom(startResp.room);
+      setMyState(startResp.my_state);
+      if (startResp.leaderboard) {
+        setLeaderboard(startResp.leaderboard);
+      }
+    } catch (err) {
+      soundManager.playError();
+      const msg = err instanceof ApiError ? err.message : "Failed to start single-player game";
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleReady = async (isReady: boolean) => {
+    const code = roomCodeRef.current || roomCode;
+    const token = sessionTokenRef.current || sessionToken;
+    if (!code || !token) return;
+    try {
+      soundManager.playClick();
+      const updated = await api.setReady(code, token, isReady);
+      roomRef.current = updated;
       setRoom(updated);
     } catch (err) {
       soundManager.playError();
@@ -231,10 +403,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addAI = async (difficulty: AIDifficulty) => {
-    if (!roomCode || !sessionToken) return;
+    const code = roomCodeRef.current || roomCode;
+    const token = sessionTokenRef.current || sessionToken;
+    if (!code || !token) return;
     try {
       soundManager.playClick();
-      const updated = await api.addAIOpponent(roomCode, sessionToken, difficulty);
+      const updated = await api.addAIOpponent(code, token, difficulty);
+      roomRef.current = updated;
       setRoom(updated);
     } catch (err) {
       soundManager.playError();
@@ -243,10 +418,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const removeAI = async (targetPlayerId: string) => {
-    if (!roomCode || !sessionToken) return;
+    const code = roomCodeRef.current || roomCode;
+    const token = sessionTokenRef.current || sessionToken;
+    if (!code || !token) return;
     try {
       soundManager.playClick();
-      const updated = await api.removeAIOpponent(roomCode, sessionToken, targetPlayerId);
+      const updated = await api.removeAIOpponent(code, token, targetPlayerId);
+      roomRef.current = updated;
       setRoom(updated);
     } catch (err) {
       soundManager.playError();
@@ -255,12 +433,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const startGame = async () => {
-    if (!roomCode || !sessionToken) return;
+    const code = roomCodeRef.current || roomCode;
+    const token = sessionTokenRef.current || sessionToken;
+    if (!code || !token) return;
     setIsLoading(true);
     setError(null);
     try {
       soundManager.playWhistle();
-      const resp = await api.startGame(roomCode, sessionToken);
+      const resp = await api.startGame(code, token);
+      roomRef.current = resp.room;
       setRoom(resp.room);
       setMyState(resp.my_state);
       if (resp.leaderboard) {
@@ -280,16 +461,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     slot_index?: number;
     candidate_token?: string;
   }) => {
-    if (!roomCode || !sessionToken) return;
+    const code = roomCodeRef.current || roomCode;
+    const token = sessionTokenRef.current || sessionToken;
+    if (!code || !token) return;
     setIsLoading(true);
     setError(null);
     try {
-      const resp = await api.submitAction(roomCode, sessionToken, action);
+      const resp = await api.submitAction(code, token, action);
       if (action.action_type === "BUY" || action.action_type === "REPLACE") {
         soundManager.playPurchase();
       } else {
         soundManager.playClick();
       }
+      roomRef.current = resp.room;
       setRoom(resp.room);
       setMyState(resp.my_state);
       setNotification(resp.message);
@@ -326,6 +510,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isConnected,
         createRoom,
         joinRoom,
+        startSinglePlayer,
         toggleReady,
         addAI,
         removeAI,

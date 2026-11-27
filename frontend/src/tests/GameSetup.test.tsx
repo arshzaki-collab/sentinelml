@@ -6,6 +6,7 @@ const mockCreateRoom = vi.fn().mockResolvedValue(undefined);
 const mockJoinRoom = vi.fn().mockResolvedValue(undefined);
 const mockAddAI = vi.fn().mockResolvedValue(undefined);
 const mockStartGame = vi.fn().mockResolvedValue(undefined);
+const mockStartSinglePlayer = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../context/GameContext", () => ({
   useGame: () => ({
@@ -13,6 +14,7 @@ vi.mock("../context/GameContext", () => ({
     joinRoom: mockJoinRoom,
     addAI: mockAddAI,
     startGame: mockStartGame,
+    startSinglePlayer: mockStartSinglePlayer,
     isLoading: false,
   }),
 }));
@@ -53,6 +55,6 @@ describe("GameSetup Component", () => {
     // Submit
     fireEvent.click(screen.getByText("START SINGLE-PLAYER MATCH"));
 
-    expect(mockCreateRoom).toHaveBeenCalled();
+    expect(mockStartSinglePlayer).toHaveBeenCalledWith("Chief Scout", "LEGEND", 3);
   });
 });

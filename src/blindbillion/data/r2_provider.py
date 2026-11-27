@@ -22,6 +22,10 @@ class TransfermarktR2Provider(DataPipelineProvider):
     def get_source_identifier(self) -> str:
         return f"dcaribou/transfermarkt-datasets@r2 ({self.base_url})"
 
+    def get_manifest(self) -> dict[str, str]:
+        """Return the dictionary mapping table names to their remote filenames."""
+        return dict(self.table_files)
+
     def download_table(self, table_name: str, target_dir: Path, force: bool = False) -> Path:
         """Download a single table file with streaming and gzip verification."""
         if table_name not in self.table_files:

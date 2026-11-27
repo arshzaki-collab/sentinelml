@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![React 18](https://img.shields.io/badge/frontend-React%2018%20%7C%20TypeScript-61dafb.svg)](https://react.dev/)
 [![DuckDB](https://img.shields.io/badge/analytical-DuckDB-FFF000.svg)](https://duckdb.org/)
-[![Tests](https://img.shields.io/badge/tests-110%20passed%20%7C%20100%25-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-133%20passed%20%7C%20100%25-brightgreen.svg)](#testing)
 
 ---
 
@@ -72,72 +72,118 @@ sentml/
 │   ├── data/           # DuckDB ingestion, ECB exchange rates, 180-day valuation selector, shortlists
 │   ├── engine/         # Server-authoritative state engine, transactions, settlement
 │   ├── ai/             # Rookie, Pro, Legend AI decision models with temporal isolation
-│   └── multiplayer/    # FastAPI, WebSockets, room lifecycle, rate limiting, session auth
+│   └── multiplayer/    # FastAPI, WebSockets, room lifecycle, rate limiting, session auth, PostgreSQL
 ├── frontend/           # React 18, Vite, TypeScript, Tailwind CSS, Framer Motion, Web Audio
 ├── data/               # Analytical DuckDB cache (blindbillion.duckdb) and SQLite/PG state
 ├── supabase/           # PostgreSQL migrations, RLS security policies, Realtime publication
-├── tests/              # 80 backend tests (100% passing) + 30 frontend tests (100% passing)
+├── tests/              # 91 backend tests (100% passing) + 42 frontend tests (100% passing)
 └── docs/               # Architecture, API, Database, and Deployment guides
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Local Development)
 
 ### Prerequisites
-- Python 3.12+
+- Python 3.12+ (or 3.11+)
 - Node.js 20+
-- DuckDB
+- `uv` (recommended) or standard `pip`
 
-### 1. Backend Setup
+---
+
+### Step 1: Historical Analytical Cache Check
+The analytical cache file (`data/blindbillion.duckdb`, ~75 MB) contains real Transfermarkt valuations and stats.
+
 ```bash
-# Create virtual environment and install dependencies
-python3 -m venv .venv
+# Verify analytical database health and historical valuation coverage:
+python -m blindbillion.data.pipeline_runner --check
+
+# Dry-run check against source manifest without modifying data:
+python -m blindbillion.data.pipeline_runner --dry-run
+
+# Run full ingestion pipeline if rebuilding from scratch:
+python -m blindbillion.data.pipeline_runner
+```
+
+---
+
+### Step 2: Start Backend Server (Terminal 1)
+```bash
+# Activate virtual environment
 source .venv/bin/activate
+
+# Install dependencies (if not already installed)
 pip install -e ".[dev]"
 
-# Ingest historical data foundation (if not already cached)
-python -m blindbillion.data.pipeline_runner
-
 # Start FastAPI server on port 8000
-uvicorn blindbillion.multiplayer.app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn blindbillion.multiplayer.app:app --host 127.0.0.1 --port 8000 --reload
+```
+Verify backend health:
+```bash
+curl -s http://127.0.0.1:8000/health
+# {"status":"healthy","version":"2.0.0","database":"connected","analytical_cache":"connected"}
 ```
 
-### 2. Frontend Setup
+---
+
+### Step 3: Start Frontend Dev Server (Terminal 2)
 ```bash
 cd frontend
+
+# Install npm dependencies
 npm install
+
+# Start Vite development server
 npm run dev
-# Application will launch on http://localhost:5173
 ```
 
-### 3. Docker Compose (Full Stack)
+The application runs on `http://localhost:5173`.
+
+#### Port 5173 Collision Resolution:
+If port 5173 is already occupied:
+1. Identify the occupying process:
+   ```bash
+   lsof -i :5173
+   ```
+2. You can run Vite on another port without killing other processes:
+   ```bash
+   npm run dev -- --port 5174
+   ```
+3. Or safely stop the previous Vite dev server using its PID:
+   ```bash
+   kill <PID>
+   ```
+
+---
+
+### Step 4: Docker Compose (Alternative Full-Stack)
 ```bash
-docker-compose up --build
+# Start backend and frontend containers:
+docker compose up --build
 ```
+Ensure `./data/blindbillion.duckdb` is present locally so the volume mount `./data:/app/data` supplies the analytical cache.
 
 ---
 
 ## 🧪 Testing & Verification
 
-### Backend Pytest Suite (80 tests)
+### Complete Backend Pytest Suite (91 tests, 100% passing)
 ```bash
 pytest -v
 ```
 
-### Frontend Vitest Suite (30 tests)
+### Complete Frontend Vitest Suite (42 tests, 100% passing)
 ```bash
-cd frontend
-npm test -- --run
+cd frontend && npm test -- --run
 ```
 
 ### Type Checking & Linting
 ```bash
 # Python strict type check & linting
-mypy src tests --strict
 ruff check src tests
+mypy src tests
 
-# TypeScript build check
+# Frontend TypeScript build check
 cd frontend && npm run build
 ```
 
@@ -148,6 +194,7 @@ cd frontend && npm run build
 - **Zero Identity Leakage:** Candidate UUIDs prevent memory extraction or packet sniffing of player identities before the 2026 reveal.
 - **Session Tokens:** High-entropy 256-bit cryptographically secure session tokens.
 - **Rate Limiting:** Sliding-window rate limiter protecting room creation (10/min) and room joining (30/min).
+- **PostgreSQL / SQLite Dual Compatibility:** Seamlessly operates with SQLite locally and Supabase PostgreSQL in production using `psycopg` (v3).
 - **Historical Accuracy:** Valuations derived from official Transfermarkt observations with a strict $\le 180$-day age threshold and pinned ECB exchange rates. Missing statistics are never fabricated.
 
 ---

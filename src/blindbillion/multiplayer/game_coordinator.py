@@ -30,6 +30,15 @@ from blindbillion.multiplayer.models import (
 from blindbillion.multiplayer.room_manager import serialize_room_view
 
 
+def parse_stored_game_state(raw: Any) -> GameState:
+    """Parse stored game state whether serialized as JSON string or dict (e.g. from JSONB)."""
+    if isinstance(raw, str):
+        return GameState.model_validate_json(raw)
+    if isinstance(raw, dict):
+        return GameState.model_validate(raw)
+    return GameState.model_validate(raw)
+
+
 class GameCoordinator:
     """Coordinates turn synchronization, action validation, and final settlement across players."""
 
@@ -75,10 +84,21 @@ class GameCoordinator:
                 detail=f"Cannot start: players not ready: {names}.",
             )
 
+        # Determine room difficulty from AI bots or default to PRO
+        room_diff = "PRO"
+        for p in room.players:
+            if p.is_ai and p.ai_difficulty:
+                room_diff = str(p.ai_difficulty).upper()
+                break
+
         # Initialize GameState for every player in the room using shared room_seed
         for player in room.players:
             game_id = f"{room.room_code}_{player.player_id}"
-            state = self.engine.initialize_game(game_id=game_id, room_seed=room.room_seed)
+            state = self.engine.initialize_game(
+                game_id=game_id,
+                room_seed=room.room_seed,
+                difficulty=room_diff,
+            )
             serialized = state.model_dump_json()
 
             existing_state_record = (
@@ -142,7 +162,11 @@ class GameCoordinator:
             .first()
         )
         if idempotency_rec:
-            cached_dict = json.loads(idempotency_rec.response_payload)
+            cached_dict = (
+                json.loads(idempotency_rec.response_payload)
+                if isinstance(idempotency_rec.response_payload, str)
+                else idempotency_rec.response_payload
+            )
             return ActionResponse.model_validate(cached_dict)
 
         # 2. Room & Phase Validation with Row-Level Lock
@@ -176,7 +200,7 @@ class GameCoordinator:
                 detail="Player game state not found.",
             )
 
-        current_state = GameState.model_validate_json(state_model.serialized_state)
+        current_state = parse_stored_game_state(state_model.serialized_state)
 
         # 4. Execute Action under Domain Exception Guard
         msg = ""
@@ -312,7 +336,7 @@ class GameCoordinator:
                         difficulty=difficulty,
                         seed=f"{room.room_seed}_{p.player_id}_{room.timeline_step_index}",
                     )
-                    p_state = GameState.model_validate_json(p_state_model.serialized_state)
+                    p_state = parse_stored_game_state(p_state_model.serialized_state)
                     advanced = ai_agent.play_turn(state=p_state, engine=self.engine)
                     p_state_model.serialized_state = advanced.model_dump_json()
                     p_state_model.state_version += 1
@@ -342,7 +366,7 @@ class GameCoordinator:
                         .first()
                     )
                     if p_state_model:
-                        p_state = GameState.model_validate_json(p_state_model.serialized_state)
+                        p_state = parse_stored_game_state(p_state_model.serialized_state)
                         if not p_state.is_completed:
                             p_state = self.engine.finalize_game(p_state)
                             p_state_model.serialized_state = p_state.model_dump_json()
@@ -365,7 +389,7 @@ class GameCoordinator:
                         .first()
                     )
                     if p_state_model:
-                        p_state = GameState.model_validate_json(p_state_model.serialized_state)
+                        p_state = parse_stored_game_state(p_state_model.serialized_state)
                         advanced = self.engine.advance_season(p_state)
                         p_state_model.serialized_state = advanced.model_dump_json()
                         p_state_model.state_version += 1
@@ -387,7 +411,7 @@ class GameCoordinator:
                     .first()
                 )
                 if p_state_model:
-                    p_state = GameState.model_validate_json(p_state_model.serialized_state)
+                    p_state = parse_stored_game_state(p_state_model.serialized_state)
                     if not p_state.is_completed:
                         p_state = self.engine.finalize_game(p_state)
                         p_state_model.serialized_state = p_state.model_dump_json()
@@ -423,7 +447,7 @@ class GameCoordinator:
                 status_code=status.HTTP_404_NOT_FOUND, detail="Game state not found for player."
             )
 
-        game_state = GameState.model_validate_json(state_model.serialized_state)
+        game_state = parse_stored_game_state(state_model.serialized_state)
         my_state_view = self._build_player_state_view(player_id, game_state, player)
 
         leaderboard: tuple[LeaderboardEntry, ...] | None = None
@@ -481,7 +505,7 @@ class GameCoordinator:
                 .first()
             )
             if p_state_model:
-                st = GameState.model_validate_json(p_state_model.serialized_state)
+                st = parse_stored_game_state(p_state_model.serialized_state)
                 net_worth = st.final_net_worth or 0.0
                 cash = st.cash_balance
                 squad_val = st.final_squad_valuation or 0.0

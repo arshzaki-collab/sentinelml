@@ -10,8 +10,9 @@ import {
   RoomPublicView,
   AIDifficulty,
 } from "../types/game";
+import { getApiBaseUrl } from "./config";
 
-const API_BASE = "/api";
+export const API_BASE = getApiBaseUrl(import.meta.env?.VITE_API_URL);
 
 export class ApiError extends Error {
   status: number;
@@ -26,10 +27,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr) {
+    const errorMsg =
+      networkErr instanceof Error ? networkErr.message : "Network error";
+    throw new ApiError(
+      `Unable to connect to game server (${errorMsg}). Please check your connection or verify the server is running.`,
+      0
+    );
+  }
 
   if (!res.ok) {
     let errMsg = `Request failed (${res.status})`;

@@ -41,10 +41,12 @@ export const FinalRevealScreen: React.FC = () => {
       const pPrice = s.purchase_price_usd || 1;
       const v2026 = s.current_valuation_usd || 0;
       const roi = ((v2026 - pPrice) / pPrice) * 100;
+      const pos = s.position || s.required_position || "Player";
+      const name = s.revealed_player_name || s.current_player_name || `Anonymous ${pos}`;
       return {
         slot_index: s.slot_index,
-        position: s.position,
-        player_name: s.revealed_player_name || `Anonymous ${s.position}`,
+        position: pos,
+        player_name: name,
         purchase_price_usd: s.purchase_price_usd || 0,
         valuation_2026_usd: v2026,
         roi_pct: Math.round(roi * 10) / 10,

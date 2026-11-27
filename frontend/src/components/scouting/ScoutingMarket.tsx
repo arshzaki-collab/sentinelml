@@ -49,7 +49,7 @@ export const ScoutingMarket: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-xs font-mono text-cyan-neon uppercase tracking-wider">
             <span className="inline-block h-2 w-2 rounded-full bg-cyan-neon animate-pulse" />
-            BUYING SEASON {room.current_year} — SLOT {activeSlotIndex} ({activeShortlist.required_position})
+            BUYING SEASON {room.current_year} — SLOT {activeSlotIndex} ({activeShortlist.required_position || (activeShortlist as any).position || activeShortlist.candidates[0]?.position || ""})
           </div>
           <h2 className="font-display text-xl sm:text-2xl font-black text-white mt-0.5">
             SCOUTING MARKET CANDIDATE DOSSIERS

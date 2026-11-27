@@ -9,7 +9,7 @@ interface GameSetupProps {
 }
 
 export const GameSetup: React.FC<GameSetupProps> = ({ initialMode, onBack }) => {
-  const { createRoom, joinRoom, addAI, startGame, isLoading } = useGame();
+  const { createRoom, joinRoom, startSinglePlayer, isLoading } = useGame();
 
   const [mode, setMode] = useState<"single" | "multiplayer">(initialMode);
   const [multiSubMode, setMultiSubMode] = useState<"create" | "join">("create");
@@ -28,16 +28,7 @@ export const GameSetup: React.FC<GameSetupProps> = ({ initialMode, onBack }) => 
   const handleStartSinglePlayer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // 1. Create Room with clean name
-      await createRoom(playerName.trim() || "Chief Scout");
-
-      // 2. Add AI opponents sequentially
-      for (let i = 0; i < aiCount; i++) {
-        await addAI(aiDifficulty);
-      }
-
-      // 3. Immediately start game
-      await startGame();
+      await startSinglePlayer(playerName.trim() || "Chief Scout", aiDifficulty, aiCount);
     } catch {
       // error handled in context
     }

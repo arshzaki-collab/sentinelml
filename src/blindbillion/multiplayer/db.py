@@ -14,14 +14,26 @@ from blindbillion.multiplayer.db_models import Base
 DEFAULT_SQLITE_PATH = Path("data/multiplayer.db")
 
 
+def normalize_database_url(url: str) -> str:
+    """Normalize database URL for SQLAlchemy 2.0 with psycopg v3 driver support.
+
+    Converts:
+    - postgres://... -> postgresql+psycopg://...
+    - postgresql://... -> postgresql+psycopg://... (if no driver specified)
+    """
+    trimmed = url.strip()
+    if trimmed.startswith("postgres://"):
+        return "postgresql+psycopg://" + trimmed[len("postgres://") :]
+    if trimmed.startswith("postgresql://") and not trimmed.startswith("postgresql+"):
+        return "postgresql+psycopg://" + trimmed[len("postgresql://") :]
+    return trimmed
+
+
 def get_database_url() -> str:
     """Retrieve configured database connection URL, defaulting to local SQLite."""
     env_url = os.environ.get("DATABASE_URL")
-    if env_url:
-        # Standardize PostgreSQL URL scheme for SQLAlchemy if needed
-        if env_url.startswith("postgres://"):
-            return env_url.replace("postgres://", "postgresql+psycopg2://", 1)
-        return env_url
+    if env_url and env_url.strip():
+        return normalize_database_url(env_url)
 
     DEFAULT_SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{DEFAULT_SQLITE_PATH}"
@@ -29,9 +41,21 @@ def get_database_url() -> str:
 
 def create_db_engine(db_url: str | None = None) -> Engine:
     """Create SQLAlchemy engine configured for concurrency and connection safety."""
-    url = db_url or get_database_url()
-    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    return create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+    url = normalize_database_url(db_url) if db_url else get_database_url()
+    if url.startswith("sqlite"):
+        return create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            pool_pre_ping=True,
+        )
+    # PostgreSQL / Supabase
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        pool_size=10,
+        max_overflow=20,
+    )
 
 
 def init_db(engine: Engine) -> None:

@@ -21,6 +21,7 @@ def test_run_pipeline_isolated(tmp_path: Path) -> None:
         "appearances",
         "player_valuations",
         "club_games",
+        "transfers",
     ):
         csv_file = raw_dir / f"{tbl}.csv.gz"
         with gzip.open(csv_file, "wt", encoding="utf-8") as gz:
@@ -69,6 +70,19 @@ def test_run_pipeline_isolated(tmp_path: Path) -> None:
                 for yr in range(2016, 2027):
                     lines.append(f"G_{yr},CLUB_A,2,0\n")
                 gz.writelines(lines)
+            elif tbl == "transfers":
+                trans_hdr = (
+                    "player_id,player_name,transfer_date,transfer_season,"
+                    "from_club_id,from_club_name,to_club_id,to_club_name,"
+                    "transfer_fee,market_value_in_eur\n"
+                )
+                lines = [trans_hdr]
+                for pid in ("P1", "P2", "P3", "P4"):
+                    lines.append(
+                        f"{pid},Player {pid},2018-07-01,18/19,CLUB_A,Club A,"
+                        "CLUB_B,Club B,25000000,20000000\n"
+                    )
+                gz.writelines(lines)
 
     # Mock the download_all call so it returns existing raw files without network call
     with patch(
@@ -84,6 +98,7 @@ def test_run_pipeline_isolated(tmp_path: Path) -> None:
                 "appearances",
                 "player_valuations",
                 "club_games",
+                "transfers",
             )
         }
 
@@ -92,3 +107,30 @@ def test_run_pipeline_isolated(tmp_path: Path) -> None:
         assert report["database_path"] == str(db_path)
         assert db_path.exists()
         assert (db_path.parent / "data_quality_report.json").exists()
+
+
+def test_validate_analytical_database_on_missing_file(tmp_path: Path) -> None:
+    from blindbillion.data.db import validate_analytical_database
+
+    non_existent = tmp_path / "does_not_exist.duckdb"
+    is_valid, status_code, details = validate_analytical_database(non_existent)
+    assert not is_valid
+    assert status_code == "missing_database"
+    assert "File not found" in details[0]
+
+
+def test_pipeline_runner_cli_dry_run() -> None:
+    from blindbillion.data.pipeline_runner import main
+
+    exit_code = main(["--dry-run"])
+    assert exit_code == 0
+
+
+def test_pipeline_runner_cli_check_existing_data() -> None:
+    from blindbillion.data.pipeline_runner import main
+
+    existing_db = Path("data/blindbillion.duckdb")
+    if existing_db.exists():
+        exit_code = main(["--check", "--db-path", str(existing_db)])
+        assert exit_code == 0
+

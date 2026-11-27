@@ -47,9 +47,11 @@ def test_stats_aggregator() -> None:
     """)
 
     # Populate: Player 1 (Striker, born 1990-01-01 -> age 26 on 2016-07-01)
+    # Populate: Player 2 (Defender, born 1992-01-01 -> age 24 on 2016-07-01)
     con.execute("""
         INSERT INTO raw_players VALUES
-        ('P1', 'Test Striker', 'Attack', 'Centre-Forward', '1990-01-01', 'GB1');
+        ('P1', 'Test Striker', 'Attack', 'Centre-Forward', '1990-01-01', 'GB1'),
+        ('P2', 'Test Defender', 'Defender', 'Centre-Back', '1992-01-01', 'GB1');
 
         INSERT INTO raw_competitions VALUES
         ('GB1', 'Premier League'),
@@ -57,9 +59,9 @@ def test_stats_aggregator() -> None:
 
         -- Match 1: Premier League game on 2015-10-10, Player club is Home (won 2-0 -> Clean sheet)
         INSERT INTO raw_games VALUES ('G1', 'CLUB_A', 'CLUB_B', 2, 0);
-        INSERT INTO raw_appearances VALUES (
-            'P1', 'G1', '2015-10-10', 'GB1', 1, 1, 0, 0, 90, 'CLUB_A'
-        );
+        INSERT INTO raw_appearances VALUES
+        ('P1', 'G1', '2015-10-10', 'GB1', 1, 1, 0, 0, 90, 'CLUB_A'),
+        ('P2', 'G1', '2015-10-10', 'GB1', 0, 0, 0, 0, 90, 'CLUB_A');
 
         -- Match 2: UCL game on 2016-03-15 (lost 1-2 -> conceded 2 goals, 1 UCL goal scored)
         INSERT INTO raw_games VALUES ('G2', 'CLUB_C', 'CLUB_A', 2, 1);
@@ -98,7 +100,15 @@ def test_stats_aggregator() -> None:
     assert res[5] == 2  # 1 league + 1 UCL goal
     assert res[6] == 1  # 1 assist
     assert res[7] == 1  # 1 yellow card
-    assert res[8] == 1  # 1 clean sheet (G1: opponent scored 0)
+    assert res[8] == 0  # 0 clean sheets (Striker position excluded from clean sheet credit)
     assert res[9] == 1  # 1 UCL goal
     assert res[10] == 1  # 1 UCL appearance
     assert res[11] == "Premier League"
+
+    # Verify Defender P2 receives clean sheet credit
+    res_p2 = con.execute("""
+        SELECT clean_sheets FROM player_season_stats
+        WHERE player_id = 'P2' AND season_year = 2016;
+    """).fetchone()
+    assert res_p2 is not None
+    assert res_p2[0] == 1  # Defender credited with clean sheet

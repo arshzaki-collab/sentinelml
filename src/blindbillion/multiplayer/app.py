@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import duckdb
 from fastapi import (
@@ -22,11 +23,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from blindbillion.data.db import DEFAULT_DB_PATH
+from blindbillion.data.db import (
+    get_analytical_db_path,
+    validate_analytical_database,
+)
 from blindbillion.engine.engine import GameEngine
 from blindbillion.multiplayer.connection_manager import connection_manager
 from blindbillion.multiplayer.db import get_db as get_db
-from blindbillion.multiplayer.db import get_engine, init_db
+from blindbillion.multiplayer.db import get_engine, get_session_factory, init_db
 from blindbillion.multiplayer.db_models import RoomModel, RoomPlayerModel
 from blindbillion.multiplayer.game_coordinator import GameCoordinator
 from blindbillion.multiplayer.models import (
@@ -52,6 +56,8 @@ from blindbillion.multiplayer.session_manager import (
     get_authenticated_player,
 )
 
+logger = logging.getLogger(__name__)
+
 # Global engine coordinator backed by analytical DuckDB cache
 _coordinator: GameCoordinator | None = None
 
@@ -60,7 +66,8 @@ def get_game_coordinator() -> GameCoordinator:
     """Retrieve or lazily initialize GameCoordinator with read-only DuckDB connection."""
     global _coordinator
     if _coordinator is None:
-        con = duckdb.connect(str(DEFAULT_DB_PATH), read_only=True)
+        db_path = get_analytical_db_path()
+        con = duckdb.connect(str(db_path), read_only=True)
         engine = GameEngine(con=con)
         _coordinator = GameCoordinator(engine=engine)
     return _coordinator
@@ -71,6 +78,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Modern lifespan handler initializing database on application startup."""
     init_db(get_engine())
     yield
+
+
+def _get_cleanup_session(app_obj: Any) -> Session:
+    """Obtain a fresh DB session for cleanup, respecting dependency overrides in tests."""
+    if hasattr(app_obj, "dependency_overrides") and get_db in app_obj.dependency_overrides:
+        override = app_obj.dependency_overrides[get_db]
+        res = override()
+        if hasattr(res, "__next__"):
+            return cast(Session, next(res))
+        return cast(Session, res)
+    return get_session_factory()()
 
 
 def create_app() -> FastAPI:
@@ -101,6 +119,11 @@ def create_app() -> FastAPI:
         status_code=status.HTTP_200_OK,
         summary="Service health check",
     )
+    @app.get(
+        "/api/health",
+        status_code=status.HTTP_200_OK,
+        summary="Service health check (API alias)",
+    )
     def health_check(
         db: Annotated[Session, Depends(get_db)],
     ) -> dict[str, Any]:
@@ -111,19 +134,21 @@ def create_app() -> FastAPI:
         except Exception as exc:  # noqa: BLE001
             db_status = f"unhealthy: {exc}"
 
-        try:
-            coordinator = get_game_coordinator()
-            duckdb_status = "connected" if coordinator.engine is not None else "uninitialized"
-        except Exception as exc:  # noqa: BLE001
-            duckdb_status = f"unhealthy: {exc}"
+        is_duckdb_valid, duckdb_status, missing_or_err = validate_analytical_database()
 
-        is_healthy = db_status == "connected" and duckdb_status == "connected"
-        return {
+        is_healthy = db_status == "connected" and is_duckdb_valid
+        resp: dict[str, Any] = {
             "status": "healthy" if is_healthy else "degraded",
             "version": "2.0.0",
             "database": db_status,
             "analytical_cache": duckdb_status,
         }
+        if not is_duckdb_valid:
+            resp["analytical_cache_help"] = (
+                f"Analytical database issues detected ({duckdb_status}: {missing_or_err}). "
+                "Run 'python -m blindbillion.data.pipeline_runner' to ingest historical data."
+            )
+        return resp
 
     @app.post(
         "/api/rooms",
@@ -400,24 +425,25 @@ def create_app() -> FastAPI:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
+        clean_room_code = room_code.strip().upper()
         try:
-            player = authenticate_player(session=db, session_token=token, room_code=room_code)
+            player = authenticate_player(session=db, session_token=token, room_code=clean_room_code)
+            player.is_connected = True
+            db.commit()
+            player_id = player.player_id
+            display_name = player.display_name
         except HTTPException:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
-
-        player.is_connected = True
-        db.commit()
-        player_id = player.player_id
-        display_name = player.display_name
-        # Release DB connection back to pool during active WebSocket loop
-        db.close()
+        finally:
+            # Release DB connection back to pool during active WebSocket loop
+            db.close()
 
         await connection_manager.connect(
-            room_code=room_code, player_id=player_id, websocket=websocket
+            room_code=clean_room_code, player_id=player_id, websocket=websocket
         )
         await connection_manager.broadcast_to_room(
-            room_code=room_code,
+            room_code=clean_room_code,
             event=RealtimeEventType.PLAYER_RECONNECTED,
             payload={"player_id": player_id, "display_name": display_name},
         )
@@ -427,28 +453,41 @@ def create_app() -> FastAPI:
                 data = await websocket.receive_text()
                 if data == "ping":
                     await websocket.send_text("pong")
-        except WebSocketDisconnect:
-            await connection_manager.disconnect(room_code=room_code, player_id=player_id)
-            player_record = (
-                db.query(RoomPlayerModel).filter(RoomPlayerModel.player_id == player_id).first()
-            )
+        except (WebSocketDisconnect, Exception):
+            pass
+        finally:
+            await connection_manager.disconnect(room_code=clean_room_code, player_id=player_id)
+
+            # Obtain a fresh database session specifically for disconnect cleanup
+            cleanup_db = _get_cleanup_session(websocket.app)
             migrated_host_id: str | None = None
-            if player_record:
-                player_record.is_connected = False
-                migrated_host_id = RoomManager.migrate_host_if_needed(
-                    session=db, room=player_record.room
+            try:
+                player_record = (
+                    cleanup_db.query(RoomPlayerModel)
+                    .filter(RoomPlayerModel.player_id == player_id)
+                    .first()
                 )
-                db.commit()
+                if player_record:
+                    player_record.is_connected = False
+                    migrated_host_id = RoomManager.migrate_host_if_needed(
+                        session=cleanup_db, room=player_record.room
+                    )
+                    cleanup_db.commit()
+            except Exception as exc:  # noqa: BLE001
+                cleanup_db.rollback()
+                logger.warning("Error during websocket disconnect database cleanup: %s", exc)
+            finally:
+                cleanup_db.close()
 
             await connection_manager.broadcast_to_room(
-                room_code=room_code,
+                room_code=clean_room_code,
                 event=RealtimeEventType.PLAYER_DISCONNECTED,
                 payload={"player_id": player_id, "display_name": display_name},
             )
 
             if migrated_host_id:
                 await connection_manager.broadcast_to_room(
-                    room_code=room_code,
+                    room_code=clean_room_code,
                     event=RealtimeEventType.HOST_MIGRATED,
                     payload={"new_host_id": migrated_host_id},
                 )
