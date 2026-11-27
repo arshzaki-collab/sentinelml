@@ -6,18 +6,44 @@ import { FormationPitch } from "./FormationPitch";
 import { ScoutingMarket } from "../scouting/ScoutingMarket";
 import { TransferMarket } from "../transfer/TransferMarket";
 import { FinalRevealScreen } from "../reveal/FinalRevealScreen";
-import { LayoutGrid, ShoppingBag } from "lucide-react";
+import { LayoutGrid, Loader2, RefreshCw, ShoppingBag } from "lucide-react";
 
 export const StadiumDashboard: React.FC = () => {
-  const { room, myState } = useGame();
+  const { room, myState, error, refreshState } = useGame();
   const [mobileTab, setMobileTab] = useState<"market" | "pitch">("market");
 
-  if (!room || !myState) return null;
+  if (!room) return null;
+
+  if (!myState) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[60vh]">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-500/40 bg-cyan-950/60 shadow-cyan-glow animate-pulse mb-4">
+          <Loader2 className="h-8 w-8 text-cyan-neon animate-spin" />
+        </div>
+        <h2 className="font-display text-xl font-bold text-white">Loading Tactical Dashboard...</h2>
+        <p className="text-xs text-slate-400 mt-1">Synchronizing server-authoritative game state</p>
+        {error && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <span className="text-xs text-red-400 font-mono">{error}</span>
+            <button
+              onClick={() => refreshState()}
+              className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-bold text-white hover:bg-cyan-500 transition mt-1"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              RETRY SYNC
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // If game is completed or at final settlement, show full-screen final reveal
   if (room.is_completed || room.current_phase === "FINAL_SETTLEMENT") {
     return <FinalRevealScreen />;
   }
+
+  const filledSlotsCount = myState.slots ? myState.slots.filter((s) => s.is_filled).length : 0;
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 p-4 sm:p-6 pb-12">
@@ -66,7 +92,7 @@ export const StadiumDashboard: React.FC = () => {
           <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
             <span>SQUAD FORMATION (7 SLOTS)</span>
             <span className="text-emerald-400 font-bold">
-              {myState.filled_slots_count} / 7 SIGNED
+              {filledSlotsCount} / 7 SIGNED
             </span>
           </div>
           <FormationPitch />

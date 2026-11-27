@@ -17,10 +17,13 @@ export const FinancialMetrics: React.FC = () => {
 
   // Calculate squad valuation as of current year from filled slots
   const squadValuation = myState.slots
-    .filter((s) => s.is_filled && s.current_valuation_usd)
-    .reduce((sum, s) => sum + (s.current_valuation_usd || 0), 0);
+    ? myState.slots
+        .filter((s) => s.is_filled)
+        .reduce((sum, s) => sum + (s.current_valuation_usd ?? s.purchase_price_usd ?? 0), 0)
+    : 0;
 
   const totalNetWorth = myState.cash_balance + squadValuation;
+  const filledSlotsCount = myState.slots ? myState.slots.filter((s) => s.is_filled).length : 0;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
@@ -73,7 +76,7 @@ export const FinancialMetrics: React.FC = () => {
           <Users className="h-4 w-4 text-slate-400" />
         </div>
         <div className="font-mono text-lg sm:text-2xl font-black text-white">
-          {myState.filled_slots_count} <span className="text-slate-500 text-sm font-normal">/ 7 SIGNED</span>
+          {filledSlotsCount} <span className="text-slate-500 text-sm font-normal">/ 7 SIGNED</span>
         </div>
         <div className="text-[10px] text-slate-400 mt-0.5">
           Phase: {room.current_phase.replace("_", " ")}

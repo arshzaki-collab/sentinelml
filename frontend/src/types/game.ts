@@ -50,7 +50,7 @@ export interface CandidateClientView {
   candidate_token: string;
   cost_usd: number;
   position: Position | string;
-  hints: [CandidateHint, CandidateHint, CandidateHint];
+  hints: CandidateHint[] | Record<string, string | number>;
 }
 
 export interface ShortlistClientView {
@@ -62,15 +62,19 @@ export interface ShortlistClientView {
 
 export interface SquadSlotClientView {
   slot_index: number;
-  position: Position | string;
+  position?: Position | string;
+  required_position?: Position | string;
   buying_year: number;
   is_filled: boolean;
   purchase_price_usd: number | null;
-  current_valuation_usd: number | null;
-  assigned_candidate_token: string | null;
-  is_revealed: boolean;
-  revealed_player_name: string | null;
-  revealed_player_id: number | null;
+  purchase_year?: number | null;
+  current_valuation_usd?: number | null;
+  assigned_candidate_token?: string | null;
+  is_revealed?: boolean;
+  revealed_player_name?: string | null;
+  current_player_name?: string | null;
+  current_player_id?: string | null;
+  revealed_player_id?: number | null;
 }
 
 export interface TransactionRecordClientView {

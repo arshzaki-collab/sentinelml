@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from pathlib import Path
 
 import duckdb
 import pytest
@@ -46,6 +47,8 @@ def client(session_factory: sessionmaker[Session]) -> Generator[TestClient, None
     app.dependency_overrides[get_db] = _override_get_db
 
     # Live DuckDB for game coordinator
+    if not Path(DEFAULT_DB_PATH).exists():
+        pytest.skip(f"Live database {DEFAULT_DB_PATH} not found; run pipeline first.")
     con = duckdb.connect(str(DEFAULT_DB_PATH), read_only=True)
     engine = GameEngine(con=con)
     coord = GameCoordinator(engine=engine)
@@ -220,3 +223,42 @@ def test_rate_limiting_on_room_creation(client: TestClient) -> None:
     res_blocked = client.post("/api/rooms", json={"host_name": "SpamHost"})
     assert res_blocked.status_code == 429
     assert "rate limit exceeded" in res_blocked.json()["detail"].lower()
+
+
+def test_health_check_endpoints(client: TestClient) -> None:
+    """Verify /health and /api/health report correct statuses."""
+    for endpoint in ("/health", "/api/health"):
+        res = client.get(endpoint)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["version"] == "2.0.0"
+        assert data["database"] == "connected"
+        assert data["status"] in ("healthy", "degraded")
+
+
+def test_health_check_degraded_when_analytical_db_missing(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Verify /health reports degraded when DuckDB path is invalid."""
+    monkeypatch.setenv("ANALYTICAL_DB_PATH", str(tmp_path / "nonexistent.duckdb"))
+    app = create_app()
+
+    def _override_get_db() -> Generator[Session, None, None]:
+        s = session_factory()
+        try:
+            yield s
+        finally:
+            s.close()
+
+    app.dependency_overrides[get_db] = _override_get_db
+
+    with TestClient(app) as tc:
+        res = tc.get("/health")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "degraded"
+        assert data["analytical_cache"] == "missing_database"
+        assert "analytical_cache_help" in data
+

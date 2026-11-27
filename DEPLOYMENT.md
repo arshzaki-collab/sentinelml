@@ -34,41 +34,41 @@ Access is restricted to the backend `service_role` key. Frontend clients interac
 
 ## 2. Backend Deployment (Docker Container)
 
-The backend is packaged as an optimized multi-stage Docker container with DuckDB pre-embedded.
+The backend is packaged as an optimized, multi-stage, unprivileged Docker container (`Dockerfile`).
 
-### Step 2.1: Environment Variables
+### Step 2.1: Storage & Analytical Cache Volume
+Because the historical analytical dataset (`blindbillion.duckdb`, 75 MB) is gitignored and contains over 200,000 real valuations, it must be mounted as a persistent volume in production (or populated via `python -m blindbillion.data.pipeline_runner` during image initialization):
+- Mount a persistent volume at `/app/data`.
+- Place `blindbillion.duckdb` inside this volume.
+- If unmounted, the server boots safely and returns `"status": "degraded"` with `"analytical_cache": "missing_database"` on `/health` and `/api/health`.
+
+### Step 2.2: Environment Variables
 Configure the following environment variables in your container runtime:
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | Supabase PostgreSQL pooled URI | `postgresql://postgres:pass@db.proj.supabase.co:5432/postgres` |
+| `DATABASE_URL` | Supabase PostgreSQL pooled URI | `postgresql://postgres:pass@db.proj.supabase.co:5432/postgres` (automatically normalized to `postgresql+psycopg://`) |
 | `ANALYTICAL_DB_PATH` | Path to DuckDB cache | `/app/data/blindbillion.duckdb` |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins | `https://blindbillion.app,https://*.vercel.app` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins | `https://your-frontend.vercel.app,http://localhost:5173` |
 | `LOG_LEVEL` | Logging verbosity | `INFO` |
 | `PORT` | Container listen port | `8000` |
 
-### Step 2.2: Cloud Run / Fly.io Deployment
-Deploy using Google Cloud Run or Fly.io:
+### Step 2.3: Cloud Run / Fly.io / Render Deployment
+Deploy using Google Cloud Run, Fly.io, or Render:
 
 ```bash
 # Build and push to registry
-docker build -t gcr.io/[PROJECT_ID]/blindbillion-backend:latest .
-docker push gcr.io/[PROJECT_ID]/blindbillion-backend:latest
+docker build -t your-org/blindbillion-backend:latest .
+docker push your-org/blindbillion-backend:latest
 
-# Deploy to Cloud Run
-gcloud run deploy blindbillion-backend \
-  --image gcr.io/[PROJECT_ID]/blindbillion-backend:latest \
-  --platform managed \
-  --region europe-west1 \
-  --allow-unauthenticated \
-  --set-env-vars "DATABASE_URL=postgresql://...,ALLOWED_ORIGINS=https://blindbillion.app"
+# Deploy with persistent volume for /app/data
 ```
 
-### Step 2.3: Verify Backend Health
+### Step 2.4: Verify Backend Health
 Verify the healthcheck endpoint:
 
 ```bash
-curl -f https://api.blindbillion.app/health
+curl -f https://your-backend.example.com/health
 # Response: {"status":"healthy","version":"2.0.0","database":"connected","analytical_cache":"connected"}
 ```
 
@@ -84,21 +84,23 @@ curl -f https://api.blindbillion.app/health
 ### Step 3.2: Configure Environment Variables
 In the Vercel Project Settings, add:
 
-| Key | Value |
-| :--- | :--- |
-| `VITE_API_URL` | `https://api.blindbillion.app` |
-| `VITE_WS_URL` | `wss://api.blindbillion.app` |
+| Key | Value | Notes |
+| :--- | :--- | :--- |
+| `VITE_API_URL` | `https://your-backend.example.com` | Base URL of deployed FastAPI backend |
+| `VITE_WS_URL` | `wss://your-backend.example.com` | WebSocket URL of backend for realtime rooms |
+
+*Note:* When these are set, the frontend talks directly to the backend without relying on reverse proxies. If left unset, the frontend defaults to `/api` and window-origin `ws://`/`wss://` (useful for Vite local proxying and monolithic reverse proxies).
 
 ### Step 3.3: Deploy
-Trigger deployment. Vercel automatically runs `npm run build` and applies the SPA routing rewrites and security headers defined in [frontend/vercel.json](file:///Users/mac/Documents/sentml/frontend/vercel.json).
+Trigger deployment. Vercel automatically runs `npm run build` and applies the SPA routing rewrites and Content-Security-Policy headers defined in [frontend/vercel.json](file:///Users/mac/Documents/sentml/frontend/vercel.json).
 
 ---
 
 ## 4. Health Checks & Monitoring
 
 1. **Uptime & Health:**
-   - Configure external uptime monitoring (e.g. BetterStack, Datadog, Pingdom) targeting `GET https://api.blindbillion.app/health` every 60 seconds.
+   - Configure external uptime monitoring (e.g. BetterStack, Datadog, Pingdom) targeting `GET https://your-backend.example.com/health` every 60 seconds.
 2. **Rate Limit Alerts:**
    - Monitor HTTP 429 status codes in container logs.
 3. **Database Connection Pooling:**
-   - Ensure Supabase connection pooler (PgBouncer, port 6543) is used if scaling to $> 50$ concurrent backend worker tasks.
+   - Ensure Supabase connection pooler (Session or Transaction mode) is used if scaling to $> 50$ concurrent backend workers. SQLAlchemy is configured with `pool_size=10`, `max_overflow=20`, `pool_recycle=300`, and `pool_pre_ping=True`.

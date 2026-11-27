@@ -39,6 +39,8 @@ def test_refresh_state_recovery_via_session_token(temp_db_path: Path) -> None:
     app = create_app()
     app.dependency_overrides[get_db] = lambda: session_factory()
 
+    if not Path(DEFAULT_DB_PATH).exists():
+        pytest.skip(f"Live database {DEFAULT_DB_PATH} not found; run pipeline first.")
     con = duckdb.connect(str(DEFAULT_DB_PATH), read_only=True)
     coord = GameCoordinator(engine=GameEngine(con=con))
     app.dependency_overrides[get_game_coordinator] = lambda: coord
@@ -140,6 +142,8 @@ def test_server_restart_state_recovery(temp_db_path: Path) -> None:
     app_1 = create_app()
     app_1.dependency_overrides[get_db] = lambda: factory_1()
 
+    if not Path(DEFAULT_DB_PATH).exists():
+        pytest.skip(f"Live database {DEFAULT_DB_PATH} not found; run pipeline first.")
     con = duckdb.connect(str(DEFAULT_DB_PATH), read_only=True)
     coord_1 = GameCoordinator(engine=GameEngine(con=con))
     app_1.dependency_overrides[get_game_coordinator] = lambda: coord_1

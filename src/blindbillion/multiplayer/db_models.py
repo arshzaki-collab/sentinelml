@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -12,9 +14,42 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    TypeDecorator,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class UniversalJson(TypeDecorator[Any]):
+    """Stores JSON transparently as TEXT on SQLite and JSONB on PostgreSQL."""
+
+    impl = Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect: Any) -> Any:
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import JSONB
+
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(Text())
+
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            return None
+        if dialect.name == "postgresql":
+            if isinstance(value, str):
+                try:
+                    return json.loads(value)
+                except Exception:
+                    return value
+            return value
+        # SQLite: ensure string
+        if isinstance(value, str):
+            return value
+        return json.dumps(value)
+
+    def process_result_value(self, value: Any, dialect: Any) -> Any:
+        return value
 
 
 class Base(DeclarativeBase):
@@ -36,15 +71,15 @@ class RoomModel(Base):
     timeline_step_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     state_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     players: Mapped[list[RoomPlayerModel]] = relationship(
         "RoomPlayerModel", back_populates="room", cascade="all, delete-orphan", lazy="joined"
@@ -72,10 +107,10 @@ class RoomPlayerModel(Base):
     is_ai: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     ai_difficulty: Mapped[str | None] = mapped_column(String(20), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     room: Mapped[RoomModel] = relationship("RoomModel", back_populates="players")
@@ -96,10 +131,10 @@ class PlayerGameStateModel(Base):
         String(4), ForeignKey("rooms.room_code", ondelete="CASCADE"), nullable=False
     )
     player_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    serialized_state: Mapped[str] = mapped_column(Text, nullable=False)
+    serialized_state: Mapped[Any] = mapped_column(UniversalJson, nullable=False)
     state_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
@@ -122,7 +157,7 @@ class ActionIdempotencyModel(Base):
     room_code: Mapped[str] = mapped_column(String(4), nullable=False, index=True)
     player_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     action_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    response_payload: Mapped[str] = mapped_column(Text, nullable=False)
+    response_payload: Mapped[Any] = mapped_column(UniversalJson, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )

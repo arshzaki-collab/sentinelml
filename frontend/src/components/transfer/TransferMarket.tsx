@@ -4,6 +4,7 @@ import { useGame } from "../../context/GameContext";
 import { CandidateClientView, SquadSlotClientView } from "../../types/game";
 import { formatUSD } from "../dashboard/FinancialMetrics";
 import { TurnWaitingOverlay } from "../barrier/TurnWaitingOverlay";
+import { normalizeHints } from "../../utils/hints";
 
 export const TransferMarket: React.FC = () => {
   const { myState, room, playerId, submitAction, isLoading } = useGame();
@@ -107,7 +108,7 @@ export const TransferMarket: React.FC = () => {
               >
                 <div className="flex items-center justify-between w-full mb-2">
                   <span className="font-display font-black text-sm text-cyan-neon">
-                    Slot {slot.slot_index} ({slot.position})
+                    Slot {slot.slot_index} ({slot.position || slot.required_position})
                   </span>
                   <span className="text-[10px] font-mono text-slate-400">
                     Signed in {slot.buying_year}
@@ -115,7 +116,7 @@ export const TransferMarket: React.FC = () => {
                 </div>
 
                 <div className="font-display text-sm font-bold text-white mb-2">
-                  Anonymous {slot.position}
+                  Anonymous {slot.position || slot.required_position}
                 </div>
 
                 <div className="flex items-center justify-between w-full text-xs font-mono pt-2 border-t border-slate-800">
@@ -136,7 +137,7 @@ export const TransferMarket: React.FC = () => {
           <div className="flex items-center justify-between border-b border-stadium-border/60 pb-3">
             <div>
               <div className="text-xs font-mono text-violet-neon font-bold">
-                REPLACEMENT SHORTLIST FOR SLOT {selectedSlot.slot_index} ({selectedSlot.position})
+                REPLACEMENT SHORTLIST FOR SLOT {selectedSlot.slot_index} ({selectedSlot.position || selectedSlot.required_position})
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 Selling this player nets{" "}
@@ -190,7 +191,7 @@ export const TransferMarket: React.FC = () => {
 
                     {/* Hints */}
                     <div className="space-y-1 my-3 text-xs">
-                      {cand.hints.map((hint, hIdx) => (
+                      {normalizeHints(cand.hints).map((hint, hIdx) => (
                         <div
                           key={hIdx}
                           className="flex justify-between rounded bg-stadium-darkest/50 px-2 py-1 text-slate-300"

@@ -14,6 +14,7 @@ from blindbillion.data.db import DEFAULT_DB_PATH, DuckDBManager
 from blindbillion.data.r2_provider import TransfermarktR2Provider
 from blindbillion.data.shortlist import ShortlistGenerator
 from blindbillion.data.stats import StatsAggregator
+from blindbillion.data.transfers import TransferEngine
 from blindbillion.data.valuations import ValuationEngine
 
 logger = logging.getLogger("blindbillion.data.pipeline")
@@ -84,6 +85,15 @@ def run_pipeline(
         stats_count = stats_aggregator.build_season_stats_table()
         report["steps"]["stats"] = {
             "total_season_stats_rows": stats_count,
+        }
+
+        logger.info("--- Step 4b: Materializing player_transfer_history ---")
+        transfer_engine = TransferEngine(con=con)
+        transfers_count = transfer_engine.build_transfer_history_table(
+            data_source=provider.get_source_identifier()
+        )
+        report["steps"]["transfers"] = {
+            "total_transfer_history_rows": transfers_count,
         }
 
         # Step 5: Data validation and shortlist verification

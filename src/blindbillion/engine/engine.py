@@ -53,9 +53,17 @@ class GameEngine:
         self.valuation_engine = ValuationEngine(con=self.con)
         self.shortlist_gen = ShortlistGenerator(con=self.con)
 
-    def initialize_game(self, game_id: str, room_seed: str | int) -> GameState:
+    def initialize_game(
+        self,
+        game_id: str,
+        room_seed: str | int,
+        difficulty: str = "PRO",
+    ) -> GameState:
         """Create and initialize a new game session with $1B and deterministic shortlists."""
-        shortlists = self.shortlist_gen.generate_full_game_shortlists(room_seed=room_seed)
+        shortlists = self.shortlist_gen.generate_full_game_shortlists(
+            room_seed=room_seed,
+            difficulty=difficulty,
+        )
 
         slots: list[PlayerSlot] = []
         for slot_cfg in SQUAD_SLOTS:

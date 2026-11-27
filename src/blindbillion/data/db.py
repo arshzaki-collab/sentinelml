@@ -1,6 +1,7 @@
 """DuckDB analytical storage manager and raw table ingestion engine."""
 
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,11 +12,69 @@ logger = logging.getLogger(__name__)
 DEFAULT_DB_PATH = Path("data/blindbillion.duckdb")
 
 
+def get_analytical_db_path() -> Path:
+    """Resolve analytical DuckDB cache path from environment or default."""
+    env_path = os.environ.get("ANALYTICAL_DB_PATH")
+    if env_path and env_path.strip():
+        p = Path(env_path.strip())
+        return p if p.is_absolute() else Path.cwd() / p
+    return Path.cwd() / "data" / "blindbillion.duckdb"
+
+
+REQUIRED_ANALYTICAL_TABLES: tuple[str, ...] = (
+    "raw_players",
+    "player_annual_valuations",
+    "player_season_stats",
+)
+
+
+def validate_analytical_database(
+    db_path: Path | str | None = None,
+) -> tuple[bool, str, list[str]]:
+    """Validate existence, readability, and required analytical tables.
+
+    Returns:
+        tuple of (is_valid: bool, status_code: str, details_or_missing_tables: list[str])
+    """
+    path = Path(db_path) if db_path is not None else get_analytical_db_path()
+    if not path.exists():
+        return False, "missing_database", [f"File not found: {path}"]
+    if not os.access(path, os.R_OK):
+        return False, "unreadable_database", [f"Permission denied: {path}"]
+
+    try:
+        con = duckdb.connect(str(path), read_only=True)
+        tables = {
+            r[0]
+            for r in con.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+            ).fetchall()
+        }
+        con.close()
+
+        missing: list[str] = []
+        for tbl in REQUIRED_ANALYTICAL_TABLES:
+            if tbl == "player_annual_valuations":
+                if (
+                    "player_annual_valuations" not in tables
+                    and "materialized_valuations" not in tables
+                ):
+                    missing.append("player_annual_valuations")
+            elif tbl not in tables:
+                missing.append(tbl)
+
+        if missing:
+            return False, "missing_tables", missing
+        return True, "connected", []
+    except Exception as exc:  # noqa: BLE001
+        return False, "database_error", [str(exc)]
+
+
 class DuckDBManager:
     """Manages the local DuckDB analytical database for Blind Billion 2.0."""
 
-    def __init__(self, db_path: Path | str = DEFAULT_DB_PATH) -> None:
-        self.db_path = Path(db_path)
+    def __init__(self, db_path: Path | str | None = None) -> None:
+        self.db_path = Path(db_path) if db_path is not None else get_analytical_db_path()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
     def get_connection(self) -> duckdb.DuckDBPyConnection:

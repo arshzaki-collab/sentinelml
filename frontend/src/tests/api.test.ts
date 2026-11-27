@@ -89,5 +89,47 @@ describe("Frontend API Client Service", () => {
       "Turn already submitted for this round."
     );
   });
+
+  it("wraps fetch network errors in user-friendly ApiError", async () => {
+    (globalThis.fetch as any).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    await expect(api.getRoom("ABCD")).rejects.toThrow(
+      /Unable to connect to game server/
+    );
+  });
+
+  it("getRoom sends GET request with normalized code", async () => {
+    (globalThis.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ room_code: "ABCD", status: "LOBBY" }),
+    });
+
+    const room = await api.getRoom("abcd");
+    expect(room.room_code).toBe("ABCD");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/rooms/ABCD",
+      expect.objectContaining({ headers: expect.any(Headers) })
+    );
+  });
+
+  it("getGameState sends GET request with Authorization header", async () => {
+    (globalThis.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        room: { room_code: "ABCD", status: "IN_GAME" },
+        my_state: { cash_balance: 1000000000 },
+      }),
+    });
+
+    const state = await api.getGameState("abcd", "tok-secret");
+    expect(state.room.status).toBe("IN_GAME");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/rooms/ABCD/state",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.any(Headers),
+      })
+    );
+  });
 });
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { CandidateClientView, CandidateHint } from "../../types/game";
 import { formatUSD } from "../dashboard/FinancialMetrics";
+import { normalizeHints } from "../../utils/hints";
 
 interface CandidateCardProps {
   candidate: CandidateClientView;
@@ -22,20 +23,25 @@ interface CandidateCardProps {
 }
 
 const renderHintIcon = (iconKey: string) => {
-  switch (iconKey) {
+  const key = iconKey.toLowerCase().replace(/[\s_]+/g, "_");
+  switch (key) {
     case "goals":
       return <Flame className="h-4 w-4 text-amber-400" />;
     case "assists":
       return <Zap className="h-4 w-4 text-cyan-neon" />;
     case "clean_sheets":
+    case "cleansheets":
       return <Shield className="h-4 w-4 text-emerald-400" />;
     case "age":
       return <Calendar className="h-4 w-4 text-violet-400" />;
     case "league":
+    case "domestic_league":
       return <Globe2 className="h-4 w-4 text-sky-400" />;
     case "ucl_goals":
+    case "uclgoals":
       return <Trophy className="h-4 w-4 text-gold-glow" />;
     case "cards":
+    case "yellow_cards":
       return <Award className="h-4 w-4 text-red-400" />;
     default:
       return <Compass className="h-4 w-4 text-slate-400" />;
@@ -50,7 +56,9 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
   disabled,
 }) => {
   const [confirming, setConfirming] = useState(false);
-  const isAffordable = candidate.cost_usd <= availableCash;
+  const cost = candidate.cost_usd ?? 0;
+  const isAffordable = cost <= availableCash;
+  const hintsList = normalizeHints(candidate.hints);
 
   const handleBuyClick = () => {
     if (!isAffordable || disabled) return;
@@ -105,13 +113,13 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
           </div>
         </div>
 
-        {/* Exactly 3 Scouting Hints */}
+        {/* Statistical Hints */}
         <div className="space-y-2 mb-4">
           <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-            SCOUTING STATISTICAL HINTS (3)
+            SCOUTING STATISTICAL HINTS ({hintsList.length})
           </div>
           <div className="grid grid-cols-1 gap-2">
-            {candidate.hints.map((hint: CandidateHint, hIdx: number) => (
+            {hintsList.map((hint: CandidateHint, hIdx: number) => (
               <div
                 key={hIdx}
                 className="flex items-center justify-between rounded-lg border border-slate-800/80 bg-stadium-darkest/60 px-3 py-2"

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { GameProvider, useGame } from "./context/GameContext";
 import { Header } from "./components/common/Header";
 import { NotificationToast } from "./components/common/NotificationToast";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { MainMenu } from "./components/menu/MainMenu";
 import { GameSetup } from "./components/setup/GameSetup";
 import { MultiplayerLobby } from "./components/lobby/MultiplayerLobby";
@@ -35,15 +36,19 @@ const GameViewRouter: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <GameProvider>
-      <div className="min-h-screen flex flex-col bg-stadium-darkest text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
-        <Header />
-        <main className="flex-1 flex flex-col">
-          <GameViewRouter />
-        </main>
-        <NotificationToast />
-      </div>
-    </GameProvider>
+    <ErrorBoundary>
+      <GameProvider>
+        <div className="min-h-screen flex flex-col bg-stadium-darkest text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
+          <Header />
+          <main className="flex-1 flex flex-col">
+            <ErrorBoundary>
+              <GameViewRouter />
+            </ErrorBoundary>
+          </main>
+          <NotificationToast />
+        </div>
+      </GameProvider>
+    </ErrorBoundary>
   );
 };
 

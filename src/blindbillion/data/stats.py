@@ -53,9 +53,11 @@ class StatsAggregator:
                     COALESCE(app.red_cards, 0) AS red_cards,
                     COALESCE(app.minutes_played, 0) AS minutes_played,
                     app.player_club_id,
-                    -- Clean sheet evaluation: opponent scored 0 goals in match
+                    -- Clean sheet: Goalkeepers and Defenders playing >= 60 minutes
                     CASE
-                        WHEN g.home_club_id IS NOT NULL AND (
+                        WHEN pl.position IN ('Goalkeeper', 'Defender')
+                         AND COALESCE(app.minutes_played, 0) >= 60
+                         AND g.home_club_id IS NOT NULL AND (
                             (
                                 app.player_club_id = g.home_club_id
                                 AND COALESCE(g.away_club_goals, 1) = 0
@@ -77,6 +79,8 @@ class StatsAggregator:
                  AND CAST(app.date AS DATE) <= si.end_date
                 LEFT JOIN raw_games g
                   ON CAST(app.game_id AS VARCHAR) = CAST(g.game_id AS VARCHAR)
+                LEFT JOIN raw_players pl
+                  ON CAST(app.player_id AS VARCHAR) = CAST(pl.player_id AS VARCHAR)
             ),
             aggregated_stats AS (
                 SELECT

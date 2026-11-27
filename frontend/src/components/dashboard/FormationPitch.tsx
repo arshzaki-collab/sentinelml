@@ -41,12 +41,18 @@ export const FormationPitch: React.FC = () => {
 
       {/* 7 Tactical Slots */}
       {myState.slots.map((slot: SquadSlotClientView) => {
+        const position = slot.position || slot.required_position || "Slot";
         const layout = SLOT_TACTICAL_LAYOUT[slot.slot_index] || {
           top: "50%",
           left: "50%",
-          label: slot.position,
+          label: position,
         };
         const isActive = activeSlotIndex === slot.slot_index && room.current_phase === "BUYING_SEASON";
+        const playerName = slot.is_revealed && slot.revealed_player_name
+          ? slot.revealed_player_name
+          : slot.is_filled
+          ? (slot.current_player_name || `Anonymous ${position}`)
+          : `Empty Slot ${slot.slot_index}`;
 
         return (
           <div
@@ -65,7 +71,7 @@ export const FormationPitch: React.FC = () => {
               }`}
             >
               <div className="font-display font-black text-xs sm:text-sm tracking-wider">
-                {slot.position}
+                {position}
               </div>
               <div className="text-[9px] font-mono text-slate-400">
                 {slot.buying_year}
@@ -82,11 +88,7 @@ export const FormationPitch: React.FC = () => {
             {/* Name / Price Tag Underneath */}
             <div className="mt-1 flex flex-col items-center rounded-md bg-stadium-darkest/90 px-2 py-0.5 border border-slate-800 backdrop-blur-sm max-w-[120px] text-center">
               <span className="text-[10px] font-display font-bold text-white truncate w-full">
-                {slot.is_revealed && slot.revealed_player_name
-                  ? slot.revealed_player_name
-                  : slot.is_filled
-                  ? `Anonymous ${slot.position}`
-                  : `Empty Slot ${slot.slot_index}`}
+                {playerName}
               </span>
               {slot.is_filled && slot.purchase_price_usd && (
                 <span className="text-[9px] font-mono font-medium text-emerald-400">

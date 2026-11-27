@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Generator
+from pathlib import Path
 
 import duckdb
 import pytest
@@ -46,6 +47,8 @@ def client(session_factory: sessionmaker[Session]) -> Generator[TestClient, None
 
     app.dependency_overrides[get_db] = _override_get_db
 
+    if not Path(DEFAULT_DB_PATH).exists():
+        pytest.skip(f"Live database {DEFAULT_DB_PATH} not found; run pipeline first.")
     con = duckdb.connect(str(DEFAULT_DB_PATH), read_only=True)
     engine = GameEngine(con=con)
     coord = GameCoordinator(engine=engine)

@@ -3,23 +3,39 @@
  */
 
 import { RealtimeEventType, WebSocketEvent } from "../types/game";
+import { getWebSocketUrl } from "./config";
 
 export type EventHandler = (event: WebSocketEvent) => void;
+export type ConnectionStatusHandler = (isConnected: boolean) => void;
 
 export class GameWebSocketClient {
   private ws: WebSocket | null = null;
   private roomCode: string;
   private token: string;
+  private customWsUrl?: string;
   private handlers: Map<RealtimeEventType | "*", Set<EventHandler>> = new Map();
+  private statusHandlers: Set<ConnectionStatusHandler> = new Set();
   private pingInterval: number | null = null;
   private reconnectTimeout: number | null = null;
   private isExplicitlyClosed = false;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 8;
 
-  constructor(roomCode: string, token: string) {
+  constructor(roomCode: string, token: string, customWsUrl?: string) {
     this.roomCode = roomCode.trim().toUpperCase();
     this.token = token;
+    this.customWsUrl = customWsUrl;
+  }
+
+  public onConnectionStatus(handler: ConnectionStatusHandler): () => void {
+    this.statusHandlers.add(handler);
+    return () => {
+      this.statusHandlers.delete(handler);
+    };
+  }
+
+  private notifyStatus(connected: boolean): void {
+    this.statusHandlers.forEach((h) => h(connected));
   }
 
   public connect(): void {
@@ -28,14 +44,17 @@ export class GameWebSocketClient {
     }
 
     this.isExplicitlyClosed = false;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    const url = `${protocol}//${host}/ws/rooms/${this.roomCode}?token=${encodeURIComponent(this.token)}`;
+    const url = getWebSocketUrl(
+      this.roomCode,
+      this.token,
+      this.customWsUrl || import.meta.env?.VITE_WS_URL
+    );
 
     try {
       this.ws = new WebSocket(url);
     } catch (err) {
       console.error("Failed to instantiate WebSocket:", err);
+      this.notifyStatus(false);
       this.scheduleReconnect();
       return;
     }
@@ -43,6 +62,7 @@ export class GameWebSocketClient {
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
       this.startHeartbeat();
+      this.notifyStatus(true);
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
@@ -57,8 +77,18 @@ export class GameWebSocketClient {
       }
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (event: CloseEvent) => {
       this.stopHeartbeat();
+      this.notifyStatus(false);
+
+      // If server explicitly rejected authentication (1008 policy violation or custom 4401/4403), do not reconnect
+      const code = event?.code;
+      if (code === 1008 || code === 4401 || code === 4403) {
+        console.warn(`WebSocket closed due to auth rejection (code ${code}). Stopping reconnect.`);
+        this.isExplicitlyClosed = true;
+        return;
+      }
+
       if (!this.isExplicitlyClosed) {
         this.scheduleReconnect();
       }
@@ -66,6 +96,7 @@ export class GameWebSocketClient {
 
     this.ws.onerror = (err) => {
       console.warn("WebSocket error:", err);
+      this.notifyStatus(false);
     };
   }
 
@@ -139,5 +170,6 @@ export class GameWebSocketClient {
       this.ws.close();
       this.ws = null;
     }
+    this.notifyStatus(false);
   }
 }

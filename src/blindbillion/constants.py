@@ -51,6 +51,7 @@ CORE_TABLE_FILES: Final[dict[str, str]] = {
     "appearances": "appearances.csv.gz",
     "player_valuations": "player_valuations.csv.gz",
     "club_games": "club_games.csv.gz",
+    "transfers": "transfers.csv.gz",
 }
 
 # European League Competition Codes
